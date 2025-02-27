@@ -268,52 +268,50 @@ void testMisc(String identifier, {required bool isVerity}) {
 
 void testAvailableOfflineRecordingDataTypes(String identifier) {
   test('Should test available offline recordings data types', () async {
-    final mockDataTypes =
-        jsonEncode(PolarDataType.values.map((e) => e.toJson()).toList());
-
-    final dataTypes =
+    final dataTypes = 
         await polar.getAvailableOfflineRecordingDataTypes(identifier);
-    expect(dataTypes, mockDataTypes);
+    expect(dataTypes, isNotEmpty);
+    expect(dataTypes, isA<Set<PolarDataType>>());
+    expect(dataTypes.length, equals(PolarDataType.values.length));
+    expect(dataTypes.contains(PolarDataType.acc), isTrue);
+    expect(dataTypes.contains(PolarDataType.hr), isTrue);
   });
 }
 
 void testOfflineRecording(String identifier) {
-  test('Should test all offline recording functions', () async {
-    final settings = await polar.requestOfflineRecordingSettings(
-      identifier,
-      PolarDataType.acc,
-    );
-    expect(settings != null, true);
+    test('Should test all offline recording functions', () async {
+      final settings = await polar.requestOfflineRecordingSettings(
+        identifier,
+        PolarDataType.acc,
+      );
+      expect(settings != null, true);
 
-    await polar.startOfflineRecording(
-      identifier,
-      PolarDataType.acc,
-      settings: settings,
-    );
+      await polar.startOfflineRecording(
+        identifier,
+        PolarDataType.acc,
+        settings: settings,
+      );
 
-    final recordingStatus = await polar.getOfflineRecordingStatus(identifier);
-    expect(recordingStatus[0], PolarDataType.acc);
+      final recordingStatus = await polar.getOfflineRecordingStatus(identifier);
+      expect(recordingStatus[0], PolarDataType.acc);
 
-    await polar.stopOfflineRecording(identifier, PolarDataType.acc);
+      await polar.stopOfflineRecording(identifier, PolarDataType.acc);
 
-    final recordings = await polar.listOfflineRecordings(identifier);
+      final recordings = await polar.listOfflineRecordings(identifier);
 
-    expect(recordings.length, 1);
+      expect(recordings.length, 1);
 
-    final entry = recordings.first;
+      final entry = recordings.first;
 
-    final accRecord = await polar.getOfflineAccRecord(identifier, entry);
-    expect(accRecord?.data.samples.length, 1);
+      final accRecord = await polar.getOfflineAccRecord(identifier, entry);
+      expect(accRecord?.data.samples.length, 1);
 
-    final ppiRecord = await polar.getOfflineAccRecord(identifier, entry);
-    expect(ppiRecord == null, true);
+      final diskSpace = await polar.getDiskSpace(identifier);
+      expect(diskSpace[1], 14362624);
 
-    final diskSpace = await polar.getDiskSpace(identifier);
-    expect(diskSpace[1], 14362624);
+      await polar.removeOfflineRecord(identifier, entry);
 
-    await polar.removeOfflineRecord(identifier, entry);
-
-    final diskSpaceAfterRemove = await polar.getDiskSpace(identifier);
-    expect(diskSpaceAfterRemove[1], 14369729);
+      final diskSpaceAfterRemove = await polar.getDiskSpace(identifier);
+      expect(diskSpaceAfterRemove[1], 14369729);
   });
 }

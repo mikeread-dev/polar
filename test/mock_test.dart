@@ -64,8 +64,11 @@ var sdkModeEnabled = false;
 final offlineRecordings = <PolarOfflineRecordingEntry>[];
 var diskSpace = [14416896, 14369729];
 
-Future<dynamic> handleMethodCall(MethodCall call) async {
-  switch (call.method) {
+Future<dynamic> handleMethodCall(MethodCall methodCall) async {
+  print('Method called: ${methodCall.method}');
+  print('Arguments: ${methodCall.arguments}');
+  
+  switch (methodCall.method) {
     case 'connectToDevice':
       executeLater(() async {
         await invoke('deviceConnecting', info);
@@ -87,13 +90,13 @@ Future<dynamic> handleMethodCall(MethodCall call) async {
     case 'createStreamingChannel':
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockStreamHandler(
-        EventChannel(call.arguments[0] as String),
-        StreamingHandler(PolarDataType.fromJson(call.arguments[2])),
-      );
+              EventChannel(methodCall.arguments[0] as String),
+              StreamingHandler(PolarDataType.fromJson(methodCall.arguments[2])),
+          );
       return null;
     case 'startRecording':
       recording = true;
-      exerciseId = call.arguments[1];
+      exerciseId = methodCall.arguments[1];
       return null;
     case 'stopRecording':
       recording = false;
@@ -103,6 +106,8 @@ Future<dynamic> handleMethodCall(MethodCall call) async {
       return null;
     case 'requestRecordingStatus':
       return [recording, exerciseId];
+    case 'getOfflineRecordingStatus':
+      return [PolarDataType.acc.toJson()];  // Return only ACC as the active recording
     case 'listExercises':
       return exercises.map(jsonEncode).toList();
     case 'fetchExercise':
@@ -143,7 +148,7 @@ Future<dynamic> handleMethodCall(MethodCall call) async {
       diskSpace = [14416896, 14362624];
       return null;
     case 'listOfflineRecordings':
-      return offlineRecordings;
+      return offlineRecordings.map((entry) => jsonEncode(entry.toJson())).toList();
     case 'getOfflineAccRecord':
       return offlineRecordings.isNotEmpty
           ? AccOfflineRecording(
@@ -165,7 +170,45 @@ Future<dynamic> handleMethodCall(MethodCall call) async {
     case 'removeOfflineRecord':
       diskSpace = [14416896, 14369729];
       return offlineRecordings.clear();
+    case 'getOfflineRecord':
+      final arguments = methodCall.arguments as List<dynamic>;
+      final identifier = arguments[0] as String;
+      final entryJsonString = arguments[1] as String;
+      final entry = PolarOfflineRecordingEntry.fromJson(jsonDecode(entryJsonString));
+      
+      if (entry.type == PolarDataType.acc) {
+        final now = DateTime.now();
+        final accData = {
+          'data': {
+            'type': 'acc',
+            'samples': [
+              {
+                'timeStamp': now.millisecondsSinceEpoch,
+                'x': 1,
+                'y': 1,
+                'z': 1
+              }
+            ]
+          },
+          'startTime': {
+            'year': now.year,
+            'month': now.month - 1,  // Month is 0-based in the converter
+            'dayOfMonth': now.day,
+            'hourOfDay': now.hour,
+            'minute': now.minute,
+            'second': now.second,
+          },
+          'settings': {
+            'settings': {}
+          }
+        };
+        return jsonEncode(accData);
+      } else if (entry.type == PolarDataType.ppi) {
+        return null;
+      }
+      return null;
     default:
+      print('Unimplemented method: ${methodCall.method}');
       throw UnimplementedError();
   }
 }
