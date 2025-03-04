@@ -42,6 +42,7 @@ void main() {
   testMisc(identifier, isVerity: true);
   testAvailableOfflineRecordingDataTypes(identifier);
   testOfflineRecording(identifier);
+  testSleepData(identifier);
 }
 
 Future<void> invoke(String method, [dynamic arguments]) {
@@ -207,6 +208,30 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
         return null;
       }
       return null;
+    case 'getSleep':
+      final now = DateTime.now();
+      final mockSleepData = [
+        {
+          'date': now.subtract(const Duration(days: 1)).toIso8601String().split('T')[0],
+          'analysis': {
+            'sleepDuration': 28800000, // 8 hours in milliseconds
+            'continuousSleepDuration': 25200000, // 7 hours in milliseconds
+            'sleepIntervals': [
+              {
+                'startTime': now.subtract(const Duration(hours: 8)).toIso8601String(),
+                'endTime': now.subtract(const Duration(hours: 7)).toIso8601String(),
+                'sleepStage': 'LIGHT_SLEEP'
+              },
+              {
+                'startTime': now.subtract(const Duration(hours: 7)).toIso8601String(),
+                'endTime': now.subtract(const Duration(hours: 6)).toIso8601String(),
+                'sleepStage': 'DEEP_SLEEP'
+              }
+            ]
+          }
+        }
+      ];
+      return jsonEncode(mockSleepData);
     default:
       print('Unimplemented method: ${methodCall.method}');
       throw UnimplementedError();

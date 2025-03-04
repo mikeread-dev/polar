@@ -856,4 +856,20 @@ class Polar {
     // If the result is null, default to false for safety
     return result ?? false;
   }
+
+  /// Get sleep data for a specific date range
+  Future<List<PolarSleepData>> getSleep(
+    String identifier,
+    DateTime fromDate,
+    DateTime toDate,
+  ) async {
+    final result = await _channel.invokeMethod('getSleep', [
+      identifier,
+      fromDate.toIso8601String().split('T')[0],
+      toDate.toIso8601String().split('T')[0],
+    ]);
+    
+    final List<dynamic> jsonList = json.decode(result);
+    return jsonList.map((json) => PolarSleepData.fromJson(json)).toList();
+  }
 }

@@ -13,3 +13,4 @@ export 'src/model/polar_sensor_setting.dart';
 export 'src/model/polar_streaming.dart';
 export 'src/model/polar_offline_record_entry.dart';
 export 'src/model/polar_first_time_use_config.dart';
+export 'src/model/polar_sleep.dart';

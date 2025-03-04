@@ -179,7 +179,7 @@ class PolarPlugin :
             "setLocalTime" -> setLocalTime(call, result)
             "doFirstTimeUse" -> doFirstTimeUse(call, result)
             "isFtuDone" -> isFtuDone(call, result)
-
+            "getSleep" -> getSleep(call, result)
             else -> result.notImplemented()
         }
     }
@@ -815,6 +815,24 @@ class PolarPlugin :
             }, {
                 runOnUiThread {
                     result.error(it.toString(), it.message, null)
+                }
+            })
+            .discard()
+    }
+
+    private fun getSleep(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        val fromDate = LocalDate.parse(arguments[1] as String)
+        val toDate = LocalDate.parse(arguments[2] as String)
+
+        wrapper.api
+            .getSleep(identifier, fromDate, toDate)
+            .subscribe({ sleepDataList ->
+                runOnUiThread { result.success(gson.toJson(sleepDataList)) }
+            }, {
+                runOnUiThread {
+                    result.error("ERROR_GETTING_SLEEP_DATA", it.message, null)
                 }
             })
             .discard()
