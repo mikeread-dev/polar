@@ -29,14 +29,6 @@ apply plugin: 'kotlin-android'
 android {
     compileSdk 33
 
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
-    defaultConfig {
-        minSdkVersion 24
-        consumerProguardFiles 'proguard-rules.pro'
-    }
-
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
@@ -45,8 +37,6 @@ android {
     kotlinOptions {
         jvmTarget = '11'
     }
-
-    namespace "dev.rexios.polar"
 }
 
 dependencies {
