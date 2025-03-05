@@ -29,7 +29,7 @@ import com.polar.sdk.api.model.PolarHrData
 import com.polar.sdk.api.model.PolarSensorSetting
 import com.polar.sdk.api.model.PolarOfflineRecordingEntry
 import com.polar.sdk.api.model.sleep.PolarSleepData
-import com.polar.sdk.api.model.sleep.PolarSleepStage
+import com.polar.sdk.api.model.sleep.SleepStage as PolarSleepStage
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
