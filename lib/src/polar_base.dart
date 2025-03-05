@@ -877,17 +877,12 @@ class Polar {
     if (response == null) return [];
     
     try {
-      if (response is String) {
-        // Handle Android JSON string response
-        final List<dynamic> jsonList = jsonDecode(response);
-        return jsonList
-            .map((json) => PolarSleepData.fromJson(json as Map<String, dynamic>))
-            .toList();
-      } else if (response is List) {
-        // Handle iOS direct array response
+      if (response is List) {
         return response
             .map((data) => PolarSleepData.fromJson(_convertToStringDynamicMap(data as Map<Object?, Object?>)))
             .toList();
+      } else if (response is Map) {
+        return [PolarSleepData.fromJson(_convertToStringDynamicMap(response as Map<Object?, Object?>))];
       }
       return [];
     } catch (e) {
