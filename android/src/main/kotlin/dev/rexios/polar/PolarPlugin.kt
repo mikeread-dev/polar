@@ -29,6 +29,7 @@ import com.polar.sdk.api.model.PolarHrData
 import com.polar.sdk.api.model.PolarSensorSetting
 import com.polar.sdk.api.model.PolarOfflineRecordingEntry
 import com.polar.sdk.api.model.PolarSleepData
+import com.polar.sdk.api.model.PolarSleepStage
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -831,23 +832,22 @@ class PolarPlugin :
 
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
-            .subscribe({ sleepDataList: List<PolarSleepData> ->
+            .subscribe({ sleepDataList ->
                 runOnUiThread { 
-                    // Convert the sleep data to a List<Map<String, Any>>
-                    val mappedData = sleepDataList.map { sleepData: PolarSleepData ->
-                        mapOf<String, Any>(
-                            "id" to sleepData.id,
-                            "startTime" to sleepData.startTime.toString(),
-                            "endTime" to sleepData.endTime.toString(),
-                            "duration" to sleepData.duration,
-                            "continuity" to sleepData.continuity,
-                            "sleepStages" to (sleepData.sleepStages?.map { stage ->
-                                mapOf(
+                    val mappedData = sleepDataList.map { sleepData ->
+                        hashMapOf(
+                            "id" to sleepData.sleepId,
+                            "startTime" to sleepData.sleepStartTime.toString(),
+                            "endTime" to sleepData.sleepEndTime.toString(),
+                            "duration" to sleepData.sleepDuration,
+                            "continuity" to sleepData.sleepContinuity,
+                            "sleepStages" to (sleepData.stages.map { stage ->
+                                hashMapOf(
                                     "startTime" to stage.startTime.toString(),
                                     "endTime" to stage.endTime.toString(),
-                                    "stage" to stage.stage.name
+                                    "stage" to stage.type.name
                                 )
-                            } ?: emptyList())
+                            })
                         )
                     }
                     result.success(mappedData)
