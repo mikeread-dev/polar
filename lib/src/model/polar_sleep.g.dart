@@ -45,7 +45,7 @@ SleepInterval _$SleepIntervalFromJson(Map<String, dynamic> json) =>
     SleepInterval(
       startTime: DateTime.parse(json['startTime'] as String),
       endTime: DateTime.parse(json['endTime'] as String),
-      sleepStage: json['sleepStage'] as String,
+      sleepStage: json['sleepStage'] as PolarSleepStage,
     );
 
 Map<String, dynamic> _$SleepIntervalToJson(SleepInterval instance) =>

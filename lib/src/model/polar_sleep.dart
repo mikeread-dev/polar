@@ -13,6 +13,10 @@ class PolarSleepData {
   /// Detailed analysis of sleep patterns and stages
   final SleepAnalysisResult analysis;
 
+  /// Creates a new [PolarSleepData] instance.
+  /// 
+  /// [date] represents the date for which sleep data was recorded.
+  /// [analysis] contains the detailed sleep analysis results.
   PolarSleepData({
     required this.date,
     required this.analysis,
