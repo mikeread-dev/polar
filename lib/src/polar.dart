@@ -24,8 +24,15 @@ Future<List<PolarSleepData>> getSleep(
         ],
     );
 
-    final List<dynamic> jsonList = jsonDecode(response!);
-    return jsonList
-        .map((json) => PolarSleepData.fromJson(json as Map<String, dynamic>))
-        .toList();
+    if (response == null) return [];
+    
+    try {
+        final List<dynamic> jsonList = jsonDecode(response);
+        return jsonList
+            .map((json) => PolarSleepData.fromJson(json as Map<String, dynamic>))
+            .toList();
+    } catch (e) {
+        // If we can't parse the response as a list, return empty list
+        return [];
+    }
 }
