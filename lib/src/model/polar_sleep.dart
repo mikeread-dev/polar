@@ -65,6 +65,7 @@ class SleepInterval {
   final DateTime endTime;
   
   /// The stage of sleep during this interval
+  @JsonKey(fromJson: _sleepStageFromJson)
   final PolarSleepStage sleepStage;
 
   SleepInterval({
@@ -72,6 +73,26 @@ class SleepInterval {
     required this.endTime,
     required this.sleepStage,
   });
+
+  static PolarSleepStage _sleepStageFromJson(dynamic json) {
+    final String stageStr = json.toString().toLowerCase();
+    switch (stageStr) {
+      case 'awake':
+      case 'wake':
+        return PolarSleepStage.awake;
+      case 'light':
+      case 'light_sleep':
+        return PolarSleepStage.light;
+      case 'deep':
+      case 'deep_sleep':
+        return PolarSleepStage.deep;
+      case 'rem':
+      case 'rem_sleep':
+        return PolarSleepStage.rem;
+      default:
+        throw ArgumentError('Unknown sleep stage: $json');
+    }
+  }
 
   factory SleepInterval.fromJson(Map<String, dynamic> json) =>
       _$SleepIntervalFromJson(json);

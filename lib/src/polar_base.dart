@@ -877,7 +877,23 @@ class Polar {
     if (result == null) return [];
     
     return result
-        .map((dynamic data) => PolarSleepData.fromJson(data! as Map<String, dynamic>))
+        .map((dynamic data) => PolarSleepData.fromJson(_convertToStringDynamicMap(data as Map<Object?, Object?>)))
         .toList();
+  }
+
+  Map<String, dynamic> _convertToStringDynamicMap(Map<Object?, Object?> map) {
+    return map.map((key, value) {
+      if (value is Map<Object?, Object?>) {
+        return MapEntry(key.toString(), _convertToStringDynamicMap(value));
+      } else if (value is List) {
+        return MapEntry(key.toString(), value.map((e) {
+          if (e is Map<Object?, Object?>) {
+            return _convertToStringDynamicMap(e);
+          }
+          return e;
+        }).toList());
+      }
+      return MapEntry(key.toString(), value);
+    });
   }
 }

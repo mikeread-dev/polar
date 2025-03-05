@@ -212,45 +212,29 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
       
       // Return empty list for dates in 2022
       if (fromDateStr.startsWith('2022')) {
-        return <Map<String, dynamic>>[];
+        return [];
       }
       
       final now = DateTime.now();
       
-      // Create the mock data with explicit casting
-      Map<String, dynamic> createSleepInterval(DateTime start, DateTime end, String stage) {
-        return {
-          'startTime': start.toIso8601String(),
-          'endTime': end.toIso8601String(),
-          'sleepStage': stage,
-        };
-      }
-
-      final mockSleepData = [
-        <String, dynamic>{
+      return [
+        {
           'date': now.subtract(const Duration(days: 1))
               .toIso8601String()
               .split('T')[0],
-          'analysis': <String, dynamic>{
+          'analysis': {
             'sleepDuration': 28800000,
             'continuousSleepDuration': 25200000,
             'sleepIntervals': [
-              createSleepInterval(
-                now.subtract(const Duration(hours: 8)),
-                now.subtract(const Duration(hours: 7)),
-                'LIGHT_SLEEP',
-              ),
-              createSleepInterval(
-                now.subtract(const Duration(hours: 7)),
-                now.subtract(const Duration(hours: 6)),
-                'DEEP_SLEEP',
-              ),
-            ],
-          },
-        },
-      ].map((e) => Map<String, dynamic>.from(e)).toList();
-      
-      return mockSleepData;
+              {
+                'startTime': now.subtract(const Duration(hours: 8)).toIso8601String(),
+                'endTime': now.subtract(const Duration(hours: 7)).toIso8601String(),
+                'sleepStage': 'DEEP_SLEEP'
+              }
+            ]
+          }
+        }
+      ];
     default:
       print('Unimplemented method: ${methodCall.method}');
       throw UnimplementedError();

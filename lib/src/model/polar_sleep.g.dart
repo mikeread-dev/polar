@@ -23,10 +23,10 @@ Map<String, dynamic> _$PolarSleepDataToJson(PolarSleepData instance) =>
 
 SleepAnalysisResult _$SleepAnalysisResultFromJson(Map<String, dynamic> json) =>
     SleepAnalysisResult(
-      sleepDuration:
-          Duration(microseconds: (json['sleepDuration'] as num).toInt()),
-      continuousSleepDuration: Duration(
-          microseconds: (json['continuousSleepDuration'] as num).toInt()),
+      sleepDuration: const DurationConverter()
+          .fromJson((json['sleepDuration'] as num).toInt()),
+      continuousSleepDuration: const DurationConverter()
+          .fromJson((json['continuousSleepDuration'] as num).toInt()),
       sleepIntervals: (json['sleepIntervals'] as List<dynamic>)
           .map((e) => SleepInterval.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -35,9 +35,9 @@ SleepAnalysisResult _$SleepAnalysisResultFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$SleepAnalysisResultToJson(
         SleepAnalysisResult instance) =>
     <String, dynamic>{
-      'sleepDuration': instance.sleepDuration.inMicroseconds,
+      'sleepDuration': const DurationConverter().toJson(instance.sleepDuration),
       'continuousSleepDuration':
-          instance.continuousSleepDuration.inMicroseconds,
+          const DurationConverter().toJson(instance.continuousSleepDuration),
       'sleepIntervals': instance.sleepIntervals,
     };
 
@@ -45,12 +45,19 @@ SleepInterval _$SleepIntervalFromJson(Map<String, dynamic> json) =>
     SleepInterval(
       startTime: DateTime.parse(json['startTime'] as String),
       endTime: DateTime.parse(json['endTime'] as String),
-      sleepStage: json['sleepStage'] as PolarSleepStage,
+      sleepStage: SleepInterval._sleepStageFromJson(json['sleepStage']),
     );
 
 Map<String, dynamic> _$SleepIntervalToJson(SleepInterval instance) =>
     <String, dynamic>{
       'startTime': instance.startTime.toIso8601String(),
       'endTime': instance.endTime.toIso8601String(),
-      'sleepStage': instance.sleepStage,
+      'sleepStage': _$PolarSleepStageEnumMap[instance.sleepStage]!,
     };
+
+const _$PolarSleepStageEnumMap = {
+  PolarSleepStage.awake: 'awake',
+  PolarSleepStage.light: 'light',
+  PolarSleepStage.deep: 'deep',
+  PolarSleepStage.rem: 'rem',
+};

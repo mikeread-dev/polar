@@ -25,7 +25,6 @@ Future<List<PolarSleepData>> getSleep(
     );
 
     if (response == null || response.isEmpty) return [];
-    print('Sleep response: $response'); // Debug print
     
     try {
         final List<dynamic> jsonList = jsonDecode(response);
