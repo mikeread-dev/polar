@@ -209,6 +209,14 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
       }
       return null;
     case 'getSleep':
+      final arguments = methodCall.arguments as List<dynamic>;
+      final fromDateStr = arguments[1] as String;
+      
+      // Return empty list for dates in 2022
+      if (fromDateStr.startsWith('2022')) {
+        return '[]';  // Return empty JSON array
+      }
+      
       final now = DateTime.now();
       final mockSleepData = [
         {

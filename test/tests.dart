@@ -317,35 +317,54 @@ void testOfflineRecording(String identifier) {
 }
 
 void testSleepData(String identifier) {
-  test('sleep data', () async {
-    await connect(identifier);
-    
-    final now = DateTime.now();
-    final fromDate = now.subtract(const Duration(days: 7));
-    final toDate = now;
-    
-    final sleepData = await polar.getSleep(
-      identifier,
-      fromDate,
-      toDate,
-    );
-    
-    expect(sleepData, isNotEmpty);
-    
-    for (final data in sleepData) {
-      expect(data.date.isAfter(fromDate), isTrue);
-      expect(data.date.isBefore(toDate), isTrue);
+  group('sleep data', () {
+    test('returns sleep data for valid date range', () async {
+      await connect(identifier);
       
-      expect(data.analysis.sleepDuration.inHours, greaterThan(0));
-      expect(data.analysis.continuousSleepDuration.inHours, greaterThan(0));
-      expect(data.analysis.sleepIntervals, isNotEmpty);
+      final now = DateTime.now();
+      final fromDate = now.subtract(const Duration(days: 7));
+      final toDate = now;
       
-      for (final interval in data.analysis.sleepIntervals) {
-        expect(interval.startTime.isBefore(interval.endTime), isTrue);
-        expect(interval.sleepStage, isNotEmpty);
+      final sleepData = await polar.getSleep(
+        identifier,
+        fromDate,
+        toDate,
+      );
+      
+      expect(sleepData, isNotEmpty);
+      
+      for (final data in sleepData) {
+        expect(data.date.isAfter(fromDate), isTrue);
+        expect(data.date.isBefore(toDate), isTrue);
+        
+        expect(data.analysis.sleepDuration.inHours, greaterThan(0));
+        expect(data.analysis.continuousSleepDuration.inHours, greaterThan(0));
+        expect(data.analysis.sleepIntervals, isNotEmpty);
+        
+        for (final interval in data.analysis.sleepIntervals) {
+          expect(interval.startTime.isBefore(interval.endTime), isTrue);
+          expect(interval.sleepStage, isNotEmpty);
+        }
       }
-    }
-    
-    await disconnect(identifier);
+      
+      await disconnect(identifier);
+    });
+
+    test('returns empty list for date range with no data', () async {
+      await connect(identifier);
+      
+      final fromDate = DateTime(2022, 1, 1);
+      final toDate = DateTime(2022, 12, 31);
+      
+      final sleepData = await polar.getSleep(
+        identifier,
+        fromDate,
+        toDate,
+      );
+      
+      expect(sleepData, isEmpty);
+      
+      await disconnect(identifier);
+    });
   });
 }

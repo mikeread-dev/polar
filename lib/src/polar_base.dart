@@ -858,6 +858,8 @@ class Polar {
   }
 
   /// Get sleep data for a specific date range
+  /// 
+  /// Returns an empty list if no sleep data is available for the specified date range
   Future<List<PolarSleepData>> getSleep(
     String identifier,
     DateTime fromDate,
@@ -869,7 +871,15 @@ class Polar {
       toDate.toIso8601String().split('T')[0],
     ]);
     
-    final List<dynamic> jsonList = json.decode(result);
-    return jsonList.map((json) => PolarSleepData.fromJson(json)).toList();
+    if (result == null) return [];
+    
+    try {
+      final List<dynamic> jsonList = json.decode(result);
+      if (jsonList.isEmpty) return [];
+      
+      return jsonList.map((json) => PolarSleepData.fromJson(json)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 }
