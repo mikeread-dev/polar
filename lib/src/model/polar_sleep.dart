@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:polar/src/model/converters.dart';
+import 'package:polar/src/model/polar_sleep_stage.dart';
 
 part 'polar_sleep.g.dart';
 
@@ -60,7 +61,7 @@ class SleepInterval {
   final DateTime endTime;
   
   /// The stage of sleep during this interval
-  final String sleepStage;
+  final PolarSleepStage sleepStage;
 
   SleepInterval({
     required this.startTime,
