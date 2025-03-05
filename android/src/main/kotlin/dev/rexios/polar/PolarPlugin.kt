@@ -28,6 +28,7 @@ import com.polar.sdk.api.model.PolarHealthThermometerData
 import com.polar.sdk.api.model.PolarHrData
 import com.polar.sdk.api.model.PolarSensorSetting
 import com.polar.sdk.api.model.PolarOfflineRecordingEntry
+import com.polar.sdk.api.model.PolarSleepData
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -831,8 +832,23 @@ class PolarPlugin :
             .getSleep(identifier, fromDate, toDate)
             .subscribe({ sleepDataList ->
                 runOnUiThread { 
-                    // Convert directly to List<Map> instead of JSON string
-                    result.success(sleepDataList.map { it.toMap() })
+                    // Convert the sleep data to a Map manually
+                    result.success(sleepDataList.map { sleepData ->
+                        mapOf(
+                            "id" to sleepData.id,
+                            "startTime" to sleepData.startTime.toString(),
+                            "endTime" to sleepData.endTime.toString(),
+                            "duration" to sleepData.duration,
+                            "continuity" to sleepData.continuity,
+                            "sleepStages" to sleepData.sleepStages.map { stage ->
+                                mapOf(
+                                    "startTime" to stage.startTime.toString(),
+                                    "endTime" to stage.endTime.toString(),
+                                    "stage" to stage.stage.name
+                                )
+                            }
+                        )
+                    })
                 }
             }, {
                 runOnUiThread {
