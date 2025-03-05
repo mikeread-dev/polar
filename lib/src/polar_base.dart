@@ -865,7 +865,7 @@ class Polar {
     DateTime fromDate,
     DateTime toDate,
   ) async {
-    final result = await _channel.invokeListMethod(
+    final response = await _channel.invokeMethod(
       'getSleep',
       [
         identifier,
@@ -874,11 +874,27 @@ class Polar {
       ],
     );
 
-    if (result == null) return [];
+    if (response == null) return [];
     
-    return result
-        .map((dynamic data) => PolarSleepData.fromJson(_convertToStringDynamicMap(data as Map<Object?, Object?>)))
-        .toList();
+    try {
+      if (response is String) {
+        // Handle Android JSON string response
+        final List<dynamic> jsonList = jsonDecode(response);
+        return jsonList
+            .map((json) => PolarSleepData.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } else if (response is List) {
+        // Handle iOS direct array response
+        return response
+            .map((data) => PolarSleepData.fromJson(_convertToStringDynamicMap(data as Map<Object?, Object?>)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error parsing sleep data: $e');
+      print('Raw response: $response');
+      return [];
+    }
   }
 
   Map<String, dynamic> _convertToStringDynamicMap(Map<Object?, Object?> map) {
