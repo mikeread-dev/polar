@@ -865,17 +865,19 @@ class Polar {
     DateTime fromDate,
     DateTime toDate,
   ) async {
-    final result = await _channel.invokeListMethod('getSleep', [
-      identifier,
-      fromDate.toIso8601String().split('T')[0],
-      toDate.toIso8601String().split('T')[0],
-    ]);
+    final result = await _channel.invokeListMethod(
+      'getSleep',
+      [
+        identifier,
+        fromDate.toIso8601String().split('T')[0],
+        toDate.toIso8601String().split('T')[0],
+      ],
+    );
 
     if (result == null) return [];
-
+    
     return result
-        .cast<String>()
-        .map((e) => PolarSleepData.fromJson(jsonDecode(e)))
+        .map((dynamic data) => PolarSleepData.fromJson(data as Map<dynamic, dynamic>))
         .toList();
   }
 }

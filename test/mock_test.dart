@@ -214,32 +214,45 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
       
       // Return empty list for dates in 2022
       if (fromDateStr.startsWith('2022')) {
-        return '[]';  // Return empty JSON array
+        return <Map<String, dynamic>>[];
       }
       
       final now = DateTime.now();
+      
+      // Create the mock data with explicit casting
+      Map<String, dynamic> createSleepInterval(DateTime start, DateTime end, String stage) {
+        return {
+          'startTime': start.toIso8601String(),
+          'endTime': end.toIso8601String(),
+          'sleepStage': stage,
+        };
+      }
+
       final mockSleepData = [
-        {
-          'date': now.subtract(const Duration(days: 1)).toIso8601String().split('T')[0],
-          'analysis': {
-            'sleepDuration': 28800000, // 8 hours in milliseconds
-            'continuousSleepDuration': 25200000, // 7 hours in milliseconds
+        <String, dynamic>{
+          'date': now.subtract(const Duration(days: 1))
+              .toIso8601String()
+              .split('T')[0],
+          'analysis': <String, dynamic>{
+            'sleepDuration': 28800000,
+            'continuousSleepDuration': 25200000,
             'sleepIntervals': [
-              {
-                'startTime': now.subtract(const Duration(hours: 8)).toIso8601String(),
-                'endTime': now.subtract(const Duration(hours: 7)).toIso8601String(),
-                'sleepStage': 'LIGHT_SLEEP'
-              },
-              {
-                'startTime': now.subtract(const Duration(hours: 7)).toIso8601String(),
-                'endTime': now.subtract(const Duration(hours: 6)).toIso8601String(),
-                'sleepStage': 'DEEP_SLEEP'
-              }
-            ]
-          }
-        }
-      ];
-      return jsonEncode(mockSleepData);
+              createSleepInterval(
+                now.subtract(const Duration(hours: 8)),
+                now.subtract(const Duration(hours: 7)),
+                'LIGHT_SLEEP',
+              ),
+              createSleepInterval(
+                now.subtract(const Duration(hours: 7)),
+                now.subtract(const Duration(hours: 6)),
+                'DEEP_SLEEP',
+              ),
+            ],
+          },
+        },
+      ].map((e) => Map<String, dynamic>.from(e)).toList();
+      
+      return mockSleepData;
     default:
       print('Unimplemented method: ${methodCall.method}');
       throw UnimplementedError();

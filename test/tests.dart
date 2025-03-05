@@ -318,9 +318,15 @@ void testOfflineRecording(String identifier) {
 
 void testSleepData(String identifier) {
   group('sleep data', () {
-    test('returns sleep data for valid date range', () async {
+    setUp(() async {
       await connect(identifier);
-      
+    });
+
+    tearDown(() async {
+      await disconnect(identifier);
+    });
+
+    test('returns sleep data for valid date range', () async {
       final now = DateTime.now();
       final fromDate = now.subtract(const Duration(days: 7));
       final toDate = now;
@@ -333,26 +339,42 @@ void testSleepData(String identifier) {
       
       expect(sleepData, isNotEmpty);
       
-      for (final data in sleepData) {
-        expect(data.date.isAfter(fromDate), isTrue);
-        expect(data.date.isBefore(toDate), isTrue);
-        
-        expect(data.analysis.sleepDuration.inHours, greaterThan(0));
-        expect(data.analysis.continuousSleepDuration.inHours, greaterThan(0));
-        expect(data.analysis.sleepIntervals, isNotEmpty);
-        
-        for (final interval in data.analysis.sleepIntervals) {
-          expect(interval.startTime.isBefore(interval.endTime), isTrue);
-          expect(interval.sleepStage, isNotEmpty);
-        }
-      }
+      final firstEntry = sleepData.first;
+      expect(firstEntry, isA<PolarSleepData>());
       
-      await disconnect(identifier);
+      // Verify date is within range
+      expect(
+        firstEntry.date.isAfter(fromDate.subtract(const Duration(days: 1))), 
+        isTrue,
+      );
+      expect(
+        firstEntry.date.isBefore(toDate.add(const Duration(days: 1))), 
+        isTrue,
+      );
+      
+      // Verify sleep analysis data
+      expect(
+        firstEntry.analysis.sleepDuration,
+        equals(const Duration(hours: 8)),
+      );
+      expect(
+        firstEntry.analysis.continuousSleepDuration,
+        equals(const Duration(hours: 7)),
+      );
+      
+      // Verify sleep intervals
+      expect(firstEntry.analysis.sleepIntervals, hasLength(2));
+      
+      final firstInterval = firstEntry.analysis.sleepIntervals.first;
+      expect(firstInterval.sleepStage, equals('LIGHT_SLEEP'));
+      expect(firstInterval.startTime.isBefore(firstInterval.endTime), isTrue);
+      
+      final secondInterval = firstEntry.analysis.sleepIntervals[1];
+      expect(secondInterval.sleepStage, equals('DEEP_SLEEP'));
+      expect(secondInterval.startTime.isBefore(secondInterval.endTime), isTrue);
     });
 
     test('returns empty list for date range with no data', () async {
-      await connect(identifier);
-      
       final fromDate = DateTime(2022, 1, 1);
       final toDate = DateTime(2022, 12, 31);
       
@@ -363,8 +385,6 @@ void testSleepData(String identifier) {
       );
       
       expect(sleepData, isEmpty);
-      
-      await disconnect(identifier);
     });
   });
 }

@@ -830,7 +830,10 @@ class PolarPlugin :
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
             .subscribe({ sleepDataList ->
-                runOnUiThread { result.success(gson.toJson(sleepDataList)) }
+                runOnUiThread { 
+                    // Convert directly to List<Map> instead of JSON string
+                    result.success(sleepDataList.map { it.toMap() })
+                }
             }, {
                 runOnUiThread {
                     result.error("ERROR_GETTING_SLEEP_DATA", it.message, null)

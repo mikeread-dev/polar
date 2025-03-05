@@ -36,18 +36,12 @@ private func getSleep(call: FlutterMethodCall, result: @escaping FlutterResult) 
         }
         
         guard let sleepData = sleepData else {
-            result(nil)
+            result([])  // Return empty array
             return
         }
         
-        do {
-            let jsonData = try JSONEncoder().encode(sleepData)
-            let jsonString = String(data: jsonData, encoding: .utf8)
-            result(jsonString)
-        } catch {
-            result(FlutterError(code: "JSON_ENCODING_ERROR",
-                              message: error.localizedDescription,
-                              details: nil))
-        }
+        // Convert directly to array of dictionaries
+        let sleepDataDicts = sleepData.map { $0.toDictionary() }
+        result(sleepDataDicts)
     }
 }
