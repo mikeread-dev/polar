@@ -10,54 +10,83 @@ part of 'polar_sleep.dart';
 
 PolarSleepData _$PolarSleepDataFromJson(Map<String, dynamic> json) =>
     PolarSleepData(
-      date: DateTime.parse(json['date'] as String),
-      analysis: SleepAnalysisResult.fromJson(
-          json['analysis'] as Map<String, dynamic>),
+      date:
+          json['date'] == null ? null : DateTime.parse(json['date'] as String),
+      analysis: json['result'] == null
+          ? null
+          : SleepAnalysisResult.fromJson(
+              json['result'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$PolarSleepDataToJson(PolarSleepData instance) =>
     <String, dynamic>{
-      'date': instance.date.toIso8601String(),
-      'analysis': instance.analysis,
+      'date': instance.date?.toIso8601String(),
+      'result': instance.analysis,
     };
 
 SleepAnalysisResult _$SleepAnalysisResultFromJson(Map<String, dynamic> json) =>
     SleepAnalysisResult(
-      sleepDuration: const DurationConverter()
-          .fromJson((json['sleepDuration'] as num).toInt()),
-      continuousSleepDuration: const DurationConverter()
-          .fromJson((json['continuousSleepDuration'] as num).toInt()),
-      sleepIntervals: (json['sleepIntervals'] as List<dynamic>)
-          .map((e) => SleepInterval.fromJson(e as Map<String, dynamic>))
+      batteryRanOut: json['batteryRanOut'] as bool?,
+      deviceId: json['deviceId'] as String?,
+      lastModified: json['lastModified'] == null
+          ? null
+          : DateTime.parse(json['lastModified'] as String),
+      sleepCycles: (json['sleepCycles'] as List<dynamic>?)
+          ?.map((e) => SleepCycle.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      sleepEndOffsetSeconds: (json['sleepEndOffsetSeconds'] as num?)?.toInt(),
+      sleepEndTime: json['sleepEndTime'] == null
+          ? null
+          : DateTime.parse(json['sleepEndTime'] as String),
+      sleepGoalMinutes: (json['sleepGoalMinutes'] as num?)?.toInt(),
+      sleepResultDate: json['sleepResultDate'] == null
+          ? null
+          : DateTime.parse(json['sleepResultDate'] as String),
+      sleepStartOffsetSeconds:
+          (json['sleepStartOffsetSeconds'] as num?)?.toInt(),
+      sleepStartTime: json['sleepStartTime'] == null
+          ? null
+          : DateTime.parse(json['sleepStartTime'] as String),
+      sleepWakePhases: (json['sleepWakePhases'] as List<dynamic>?)
+          ?.map((e) => SleepWakePhase.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
 
 Map<String, dynamic> _$SleepAnalysisResultToJson(
         SleepAnalysisResult instance) =>
     <String, dynamic>{
-      'sleepDuration': const DurationConverter().toJson(instance.sleepDuration),
-      'continuousSleepDuration':
-          const DurationConverter().toJson(instance.continuousSleepDuration),
-      'sleepIntervals': instance.sleepIntervals,
+      'batteryRanOut': instance.batteryRanOut,
+      'deviceId': instance.deviceId,
+      'lastModified': instance.lastModified?.toIso8601String(),
+      'sleepCycles': instance.sleepCycles,
+      'sleepEndOffsetSeconds': instance.sleepEndOffsetSeconds,
+      'sleepEndTime': instance.sleepEndTime?.toIso8601String(),
+      'sleepGoalMinutes': instance.sleepGoalMinutes,
+      'sleepResultDate': instance.sleepResultDate?.toIso8601String(),
+      'sleepStartOffsetSeconds': instance.sleepStartOffsetSeconds,
+      'sleepStartTime': instance.sleepStartTime?.toIso8601String(),
+      'sleepWakePhases': instance.sleepWakePhases,
     };
 
-SleepInterval _$SleepIntervalFromJson(Map<String, dynamic> json) =>
-    SleepInterval(
-      startTime: DateTime.parse(json['startTime'] as String),
-      endTime: DateTime.parse(json['endTime'] as String),
-      sleepStage: SleepInterval._sleepStageFromJson(json['sleepStage']),
+SleepCycle _$SleepCycleFromJson(Map<String, dynamic> json) => SleepCycle(
+      secondsFromSleepStart: (json['secondsFromSleepStart'] as num).toInt(),
+      sleepDepthStart: (json['sleepDepthStart'] as num).toDouble(),
     );
 
-Map<String, dynamic> _$SleepIntervalToJson(SleepInterval instance) =>
+Map<String, dynamic> _$SleepCycleToJson(SleepCycle instance) =>
     <String, dynamic>{
-      'startTime': instance.startTime.toIso8601String(),
-      'endTime': instance.endTime.toIso8601String(),
-      'sleepStage': _$PolarSleepStageEnumMap[instance.sleepStage]!,
+      'secondsFromSleepStart': instance.secondsFromSleepStart,
+      'sleepDepthStart': instance.sleepDepthStart,
     };
 
-const _$PolarSleepStageEnumMap = {
-  PolarSleepStage.awake: 'awake',
-  PolarSleepStage.light: 'light',
-  PolarSleepStage.deep: 'deep',
-  PolarSleepStage.rem: 'rem',
-};
+SleepWakePhase _$SleepWakePhaseFromJson(Map<String, dynamic> json) =>
+    SleepWakePhase(
+      secondsFromSleepStart: (json['secondsFromSleepStart'] as num).toInt(),
+      state: json['state'] as String,
+    );
+
+Map<String, dynamic> _$SleepWakePhaseToJson(SleepWakePhase instance) =>
+    <String, dynamic>{
+      'secondsFromSleepStart': instance.secondsFromSleepStart,
+      'state': instance.state,
+    };

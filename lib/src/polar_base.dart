@@ -873,17 +873,27 @@ class Polar {
         toDate.toIso8601String().split('T')[0],
       ],
     );
+    print('Response content: $response');
+    print('Response type: ${response.runtimeType}');
 
     if (response == null) return [];
     
     try {
-      if (response is List) {
-        return response
-            .map((data) => PolarSleepData.fromJson(_convertToStringDynamicMap(data as Map<Object?, Object?>)))
+      final dynamic parsedResponse = jsonDecode(response as String);
+      
+      if (parsedResponse is List) {
+        print('Handling as List');
+        print('First item in list: ${parsedResponse.first}');
+        return parsedResponse
+            .where((data) => data['result'] != null && data['result'].isNotEmpty)
+            .map((data) {
+              final convertedMap = _convertToStringDynamicMap(data as Map<Object?, Object?>);
+              print('Converted map: $convertedMap');
+              return PolarSleepData.fromJson(convertedMap);
+            })
             .toList();
-      } else if (response is Map) {
-        return [PolarSleepData.fromJson(_convertToStringDynamicMap(response as Map<Object?, Object?>))];
       }
+      print('Unhandled response type');
       return [];
     } catch (e) {
       print('Error parsing sleep data: $e');

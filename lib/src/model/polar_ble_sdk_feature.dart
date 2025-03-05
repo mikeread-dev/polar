@@ -33,7 +33,10 @@ enum PolarSdkFeature {
   sdkMode,
 
   /// Feature to enable or disable SDK mode blinking LED animation.
-  ledAnimation;
+  ledAnimation,
+
+  /// Feature to access sleep data from Polar device
+  sleep;
 
   static const _featureStringMap = {
     hr: 'FEATURE_HR',
@@ -45,6 +48,7 @@ enum PolarSdkFeature {
     deviceTimeSetup: 'FEATURE_POLAR_DEVICE_TIME_SETUP',
     sdkMode: 'FEATURE_POLAR_SDK_MODE',
     ledAnimation: 'FEATURE_POLAR_LED_ANIMATION',
+    sleep: 'FEATURE_POLAR_SLEEP',
   };
 
   static final _stringFeatureMap =

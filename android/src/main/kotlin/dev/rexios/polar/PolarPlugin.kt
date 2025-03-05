@@ -48,6 +48,7 @@ import java.util.Locale
 import java.util.UUID
 import java.time.LocalDate
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 fun Any?.discard() = Unit
 
@@ -829,10 +830,44 @@ class PolarPlugin :
         val fromDate = LocalDate.parse(arguments[1] as String)
         val toDate = LocalDate.parse(arguments[2] as String)
 
+        // Create formatters for different date types
+        val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+        val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+        
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
-            .subscribe({
-                runOnUiThread { result.success(gson.toJson(it)) }
+            .subscribe({ sleepDataList ->
+                runOnUiThread {
+                    val jsonArray = sleepDataList.map { sleepData ->
+                        mapOf(
+                            "date" to (sleepData.date?.format(dateFormatter)), // LocalDate
+                            "result" to mapOf(
+                                "batteryRanOut" to sleepData.result?.batteryRanOut,
+                                "deviceId" to sleepData.result?.deviceId,
+                                "lastModified" to (sleepData.result?.lastModified?.format(dateTimeFormatter)), // LocalDateTime
+                                "sleepCycles" to sleepData.result?.sleepCycles?.map { cycle ->
+                                    mapOf(
+                                        "secondsFromSleepStart" to cycle.secondsFromSleepStart,
+                                        "sleepDepthStart" to cycle.sleepDepthStart
+                                    )
+                                },
+                                "sleepEndOffsetSeconds" to sleepData.result?.sleepEndOffsetSeconds,
+                                "sleepEndTime" to (sleepData.result?.sleepEndTime?.format(dateTimeFormatter)), // LocalDateTime
+                                "sleepGoalMinutes" to sleepData.result?.sleepGoalMinutes,
+                                "sleepResultDate" to (sleepData.result?.sleepResultDate?.format(dateFormatter)), // LocalDate
+                                "sleepStartOffsetSeconds" to sleepData.result?.sleepStartOffsetSeconds,
+                                "sleepStartTime" to (sleepData.result?.sleepStartTime?.format(dateTimeFormatter)), // LocalDateTime
+                                "sleepWakePhases" to sleepData.result?.sleepWakePhases?.map { phase ->
+                                    mapOf(
+                                        "secondsFromSleepStart" to phase.secondsFromSleepStart,
+                                        "state" to phase.state.name
+                                    )
+                                }
+                            )
+                        )
+                    }
+                    result.success(gson.toJson(jsonArray))
+                }
             }, {
                 runOnUiThread {
                     result.error(it.toString(), it.message, null)
