@@ -1,5 +1,15 @@
+import 'package:json_annotation/json_annotation.dart';
+import 'package:polar/src/model/converters.dart';
+
+part 'polar_sleep.g.dart';
+
+/// Represents sleep data for a specific date
+@JsonSerializable()
 class PolarSleepData {
+  /// The date for which sleep data was recorded
   final DateTime date;
+  
+  /// Detailed analysis of sleep patterns and stages
   final SleepAnalysisResult analysis;
 
   PolarSleepData({
@@ -7,19 +17,25 @@ class PolarSleepData {
     required this.analysis,
   });
 
-  factory PolarSleepData.fromJson(Map<dynamic, dynamic> json) {
-    return PolarSleepData(
-      date: DateTime.parse(json['date'] as String),
-      analysis: SleepAnalysisResult.fromJson(
-        Map<String, dynamic>.from(json['analysis'] as Map),
-      ),
-    );
-  }
+  factory PolarSleepData.fromJson(Map<String, dynamic> json) =>
+      _$PolarSleepDataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PolarSleepDataToJson(this);
 }
 
+/// Contains the results of sleep analysis including total sleep duration,
+/// continuous sleep duration, and detailed sleep intervals with sleep stages
+@JsonSerializable()
 class SleepAnalysisResult {
+  /// Total duration of sleep
+  @DurationConverter()
   final Duration sleepDuration;
+  
+  /// Duration of continuous sleep without interruptions
+  @DurationConverter()
   final Duration continuousSleepDuration;
+  
+  /// List of sleep intervals with detailed stage information
   final List<SleepInterval> sleepIntervals;
 
   SleepAnalysisResult({
@@ -28,20 +44,22 @@ class SleepAnalysisResult {
     required this.sleepIntervals,
   });
 
-  factory SleepAnalysisResult.fromJson(Map<String, dynamic> json) {
-    return SleepAnalysisResult(
-      sleepDuration: Duration(milliseconds: json['sleepDuration'] as int),
-      continuousSleepDuration: Duration(milliseconds: json['continuousSleepDuration'] as int),
-      sleepIntervals: (json['sleepIntervals'] as List)
-          .map((e) => SleepInterval.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-    );
-  }
+  factory SleepAnalysisResult.fromJson(Map<String, dynamic> json) =>
+      _$SleepAnalysisResultFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SleepAnalysisResultToJson(this);
 }
 
+/// Represents a single interval of sleep with start time, end time, and sleep stage
+@JsonSerializable()
 class SleepInterval {
+  /// The time when this sleep interval started
   final DateTime startTime;
+  
+  /// The time when this sleep interval ended
   final DateTime endTime;
+  
+  /// The stage of sleep during this interval
   final String sleepStage;
 
   SleepInterval({
@@ -50,11 +68,8 @@ class SleepInterval {
     required this.sleepStage,
   });
 
-  factory SleepInterval.fromJson(Map<String, dynamic> json) {
-    return SleepInterval(
-      startTime: DateTime.parse(json['startTime'] as String),
-      endTime: DateTime.parse(json['endTime'] as String),
-      sleepStage: json['sleepStage'] as String,
-    );
-  }
+  factory SleepInterval.fromJson(Map<String, dynamic> json) =>
+      _$SleepIntervalFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SleepIntervalToJson(this);
 }

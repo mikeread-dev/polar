@@ -2,7 +2,6 @@ library polar;
 
 export 'src/polar_base.dart';
 export 'src/events.dart';
-
 export 'src/model/led_config.dart';
 export 'src/model/polar_ble_sdk_feature.dart';
 export 'src/model/polar_device_data_type.dart';

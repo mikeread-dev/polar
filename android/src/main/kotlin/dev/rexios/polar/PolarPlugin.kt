@@ -832,29 +832,11 @@ class PolarPlugin :
 
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
-            .subscribe({ sleepDataList ->
-                runOnUiThread { 
-                    val mappedData = sleepDataList.map { sleepData ->
-                        hashMapOf(
-                            "id" to sleepData.sleepId,
-                            "startTime" to sleepData.sleepStartTime.toString(),
-                            "endTime" to sleepData.sleepEndTime.toString(),
-                            "duration" to sleepData.sleepDuration,
-                            "continuity" to sleepData.sleepContinuity,
-                            "sleepStages" to (sleepData.stages.map { stage ->
-                                hashMapOf(
-                                    "startTime" to stage.startTime.toString(),
-                                    "endTime" to stage.endTime.toString(),
-                                    "stage" to stage.type.name
-                                )
-                            })
-                        )
-                    }
-                    result.success(mappedData)
-                }
+            .subscribe({
+                runOnUiThread { result.success(gson.toJson(it)) }
             }, {
                 runOnUiThread {
-                    result.error("ERROR_GETTING_SLEEP_DATA", it.message, null)
+                    result.error(it.toString(), it.message, null)
                 }
             })
             .discard()

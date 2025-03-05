@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:polar/polar.dart';
-import 'package:polar/src/model/polar_offline_record_entry.dart';
 import 'package:polar/src/model/polar_offline_recording_data.dart';
 
 import 'tests.dart';
@@ -173,7 +172,6 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
       return offlineRecordings.clear();
     case 'getOfflineRecord':
       final arguments = methodCall.arguments as List<dynamic>;
-      final identifier = arguments[0] as String;
       final entryJsonString = arguments[1] as String;
       final entry = PolarOfflineRecordingEntry.fromJson(jsonDecode(entryJsonString));
       

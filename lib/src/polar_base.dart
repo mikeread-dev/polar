@@ -877,7 +877,7 @@ class Polar {
     if (result == null) return [];
     
     return result
-        .map((dynamic data) => PolarSleepData.fromJson(data as Map<dynamic, dynamic>))
+        .map((dynamic data) => PolarSleepData.fromJson(data! as Map<String, dynamic>))
         .toList();
   }
 }
