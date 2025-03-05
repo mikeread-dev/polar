@@ -47,6 +47,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.time.LocalDate
+import java.time.ZonedDateTime
 
 fun Any?.discard() = Unit
 
@@ -830,25 +831,26 @@ class PolarPlugin :
 
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
-            .subscribe({ sleepDataList ->
+            .subscribe({ sleepDataList: List<PolarSleepData> ->
                 runOnUiThread { 
-                    // Convert the sleep data to a Map manually
-                    result.success(sleepDataList.map { sleepData ->
-                        mapOf(
+                    // Convert the sleep data to a List<Map<String, Any>>
+                    val mappedData = sleepDataList.map { sleepData: PolarSleepData ->
+                        mapOf<String, Any>(
                             "id" to sleepData.id,
                             "startTime" to sleepData.startTime.toString(),
                             "endTime" to sleepData.endTime.toString(),
                             "duration" to sleepData.duration,
                             "continuity" to sleepData.continuity,
-                            "sleepStages" to sleepData.sleepStages.map { stage ->
+                            "sleepStages" to (sleepData.sleepStages?.map { stage ->
                                 mapOf(
                                     "startTime" to stage.startTime.toString(),
                                     "endTime" to stage.endTime.toString(),
                                     "stage" to stage.stage.name
                                 )
-                            }
+                            } ?: emptyList())
                         )
-                    })
+                    }
+                    result.success(mappedData)
                 }
             }, {
                 runOnUiThread {
