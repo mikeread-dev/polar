@@ -40,8 +40,17 @@ private func getSleep(call: FlutterMethodCall, result: @escaping FlutterResult) 
             return
         }
         
-        // Convert directly to array of dictionaries
-        let sleepDataDicts = sleepData.map { $0.toDictionary() }
-        result(sleepDataDicts)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        
+        do {
+            let jsonData = try encoder.encode(sleepData)
+            let jsonString = String(data: jsonData, encoding: .utf8)
+            result(jsonString)
+        } catch {
+            result(FlutterError(code: "JSON_ENCODING_ERROR",
+                              message: error.localizedDescription,
+                              details: nil))
+        }
     }
 }

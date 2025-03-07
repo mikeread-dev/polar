@@ -17,6 +17,15 @@ private func jsonEncode(_ value: Encodable) -> String? {
   return data
 }
 
+private enum PolarErrorCode {
+    static let deviceDisconnected = "device_disconnected"
+    static let notSupported = "not_supported"
+    static let invalidArgument = "invalid_argument"
+    static let operationNotAllowed = "operation_not_allowed"
+    static let timeout = "timeout"
+    static let bluetoothError = "bluetooth_error"
+}
+
 public class SwiftPolarPlugin:
   NSObject,
   FlutterPlugin,
@@ -340,23 +349,47 @@ public class SwiftPolarPlugin:
   }
 
   func removeExercise(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
-    let arguments = call.arguments as! [Any]
-    let identifier = arguments[0] as! String
-    let entry = try! decoder.decode(
-      PolarExerciseEntryCodable.self,
-      from: (arguments[1] as! String)
-        .data(using: .utf8)!
-    ).data
+    guard let arguments = call.arguments as? [Any],
+          let identifier = arguments[0] as? String,
+          let entryData = (arguments[1] as? String)?.data(using: .utf8) else {
+        result(FlutterError(
+            code: PolarErrorCode.invalidArgument,
+            message: "Invalid arguments provided",
+            details: nil
+        ))
+        return
+    }
 
-    _ = api.removeExercise(identifier, entry: entry).subscribe(
-      onCompleted: {
-        result(nil)
-      },
-      onError: { error in
-        result(
-          FlutterError(
-            code: "Error removing exercise", message: error.localizedDescription, details: nil))
-      })
+    do {
+        let entry = try JSONDecoder().decode(PolarExerciseEntryCodable.self, from: entryData).data
+        api.removeExercise(identifier, entry: entry)
+            .subscribe(
+                onCompleted: {
+                    result(nil)
+                },
+                onError: { error in
+                    let code: String
+                    if error is PolarBleSdkError.DeviceDisconnected {
+                        code = PolarErrorCode.deviceDisconnected
+                    } else if error is PolarBleSdkError.OperationNotSupported {
+                        code = PolarErrorCode.notSupported
+                    } else {
+                        code = PolarErrorCode.bluetoothError
+                    }
+                    result(FlutterError(
+                        code: code,
+                        message: error.localizedDescription,
+                        details: nil
+                    ))
+                }
+            )
+    } catch {
+        result(FlutterError(
+            code: PolarErrorCode.invalidArgument,
+            message: "Failed to decode exercise entry",
+            details: nil
+        ))
+    }
   }
 
   func setLedConfig(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {

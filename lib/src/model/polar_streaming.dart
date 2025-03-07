@@ -261,37 +261,60 @@ class PolarPpgData extends PolarStreamingData<PolarPpgSample> {
   Map<String, dynamic> toJson() => _$PolarPpgDataToJson(this);
 }
 
-/// Polar ppi sample
+/// PPI measurements provide detailed information about heart rate variability
+/// and the quality of the measurements.
 @JsonSerializable()
 class PolarPpiSample {
-  /// ppInMs Pulse to Pulse interval in milliseconds.
-  /// The value indicates the quality of PP-intervals.
-  /// When error estimate is below 10ms the PP-intervals are probably very accurate.
-  /// Error estimate values over 30ms may be caused by movement artefact or too loose sensor-skin contact.
+  /// Moment sample is taken in nanoseconds. The epoch of timestamp is 1.1.2000
+  @PolarSampleTimestampConverter()
+  final DateTime timeStamp;
+
+  /// Pulse to Pulse interval in milliseconds.
+  /// 
+  /// The value indicates the quality of PP-intervals:
+  /// - Values with error estimate below 10ms are likely very accurate
+  /// - Error estimates over 30ms may indicate movement artifacts or loose sensor contact
   @JsonKey(readValue: _readPpi)
   final int ppi;
 
-  /// ppErrorEstimate estimate of the expected absolute error in PP-interval in milliseconds
+  /// Estimate of the expected absolute error in PP-interval in milliseconds.
+  /// 
+  /// Lower values indicate more accurate measurements:
+  /// - < 10ms: Very accurate
+  /// - > 30ms: May indicate measurement issues
   @JsonKey(readValue: _readErrorEstimate)
   final int errorEstimate;
 
-  /// hr in BPM
+  /// Heart rate in beats per minute (BPM).
+  /// 
+  /// This value is calculated from the PPI measurements and represents
+  /// the current heart rate at the time of the sample.
   final int hr;
 
-  /// blockerBit = 1 if PP measurement was invalid due to acceleration or other reason
+  /// Indicates if the PP measurement was invalid due to acceleration or other reasons.
+  /// 
+  /// - true: measurement was invalid
+  /// - false: measurement was valid
   @PlatformBooleanConverter()
   final bool blockerBit;
 
-  /// skinContactStatus = 0 if the device detects poor or no contact with the skin
+  /// Indicates if the device has proper skin contact.
+  /// 
+  /// - true: good skin contact
+  /// - false: poor or no skin contact
   @PlatformBooleanConverter()
   final bool skinContactStatus;
 
-  /// skinContactSupported = 1 if the Sensor Contact feature is supported
+  /// Indicates if the device supports the Sensor Contact feature.
+  /// 
+  /// - true: feature is supported
+  /// - false: feature is not supported
   @PlatformBooleanConverter()
   final bool skinContactSupported;
 
   /// Constructor
   PolarPpiSample({
+    required this.timeStamp,
     required this.ppi,
     required this.errorEstimate,
     required this.hr,
@@ -301,11 +324,28 @@ class PolarPpiSample {
   });
 
   /// From json
-  factory PolarPpiSample.fromJson(Map<String, dynamic> json) =>
-      _$PolarPpiSampleFromJson(json);
+  factory PolarPpiSample.fromJson(Map<String, dynamic> json) {
+    return PolarPpiSample(
+      timeStamp: const PolarSampleTimestampConverter().fromJson(json['timeStamp']),
+      ppi: _readPpi(json, 'ppi') as int,
+      errorEstimate: _readErrorEstimate(json, 'errorEstimate') as int,
+      hr: (json['hr'] as num).toInt(),
+      blockerBit: const PlatformBooleanConverter().fromJson(json['blockerBit']),
+      skinContactStatus: const PlatformBooleanConverter().fromJson(json['skinContactStatus']),
+      skinContactSupported: const PlatformBooleanConverter().fromJson(json['skinContactSupported']),
+    );
+  }
 
   /// To json
-  Map<String, dynamic> toJson() => _$PolarPpiSampleToJson(this);
+  Map<String, dynamic> toJson() => {
+    'timeStamp': const PolarSampleTimestampConverter().toJson(timeStamp),
+    'ppi': ppi,
+    'errorEstimate': errorEstimate,
+    'hr': hr,
+    'blockerBit': const PlatformBooleanConverter().toJson(blockerBit),
+    'skinContactStatus': const PlatformBooleanConverter().toJson(skinContactStatus),
+    'skinContactSupported': const PlatformBooleanConverter().toJson(skinContactSupported),
+  };
 }
 
 /// Polar ppi data

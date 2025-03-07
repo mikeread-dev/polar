@@ -18,6 +18,7 @@ jobs:
         uses: actions/cache@v3
         env:
           cache-name: pub-cache
+          PUB_CACHE: ~/.pub-cache
         with:
           path: ${{ env.PUB_CACHE }}
           key: ${{ env.cache-name }}-${{ hashFiles('**/pubspec.lock') }}

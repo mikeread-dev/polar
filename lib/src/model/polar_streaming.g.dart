@@ -143,6 +143,8 @@ Map<String, dynamic> _$PolarPpgDataToJson(PolarPpgData instance) =>
 
 PolarPpiSample _$PolarPpiSampleFromJson(Map<String, dynamic> json) =>
     PolarPpiSample(
+      timeStamp: const PolarSampleTimestampConverter()
+          .fromJson((json['timeStamp'] as num).toInt()),
       ppi: (_readPpi(json, 'ppi') as num).toInt(),
       errorEstimate: (_readErrorEstimate(json, 'errorEstimate') as num).toInt(),
       hr: (json['hr'] as num).toInt(),
@@ -155,6 +157,8 @@ PolarPpiSample _$PolarPpiSampleFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$PolarPpiSampleToJson(PolarPpiSample instance) =>
     <String, dynamic>{
+      'timeStamp':
+          const PolarSampleTimestampConverter().toJson(instance.timeStamp),
       'ppi': instance.ppi,
       'errorEstimate': instance.errorEstimate,
       'hr': instance.hr,
