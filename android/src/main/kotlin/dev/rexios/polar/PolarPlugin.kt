@@ -12,6 +12,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonPrimitive
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
+import com.google.gson.JsonSyntaxException
 import com.polar.androidcommunications.api.ble.model.DisInfo
 import com.polar.sdk.api.PolarBleApi
 import com.polar.sdk.api.PolarBleApi.PolarBleSdkFeature
@@ -49,6 +50,8 @@ import java.util.UUID
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import com.polar.sdk.api.errors.PolarDeviceDisconnected
+import com.polar.sdk.api.errors.PolarOperationNotSupported
 
 fun Any?.discard() = Unit
 
@@ -75,6 +78,16 @@ private val gson = GsonBuilder().registerTypeAdapter(Date::class.java, DateSeria
 private var wrapperInternal: PolarWrapper? = null
 private val wrapper: PolarWrapper
     get() = wrapperInternal!!
+
+// Add these constants at the top of the file
+private object PolarErrorCode {
+    const val DEVICE_DISCONNECTED = "device_disconnected"
+    const val NOT_SUPPORTED = "not_supported"
+    const val INVALID_ARGUMENT = "invalid_argument"
+    const val OPERATION_NOT_ALLOWED = "operation_not_allowed"
+    const val TIMEOUT = "timeout"
+    const val BLUETOOTH_ERROR = "bluetooth_error"
+}
 
 /** PolarPlugin */
 class PolarPlugin :
@@ -398,20 +411,40 @@ class PolarPlugin :
         call: MethodCall,
         result: Result,
     ) {
-        val arguments = call.arguments as List<*>
-        val identifier = arguments[0] as String
-        val entry = gson.fromJson(arguments[1] as String, PolarExerciseEntry::class.java)
+        try {
+            val arguments = call.arguments as? List<*>
+            val identifier = arguments?.getOrNull(0) as? String
+            val entryJson = arguments?.getOrNull(1) as? String
 
-        wrapper.api
-            .removeExercise(identifier, entry)
-            .subscribe({
-                runOnUiThread { result.success(null) }
-            }, {
-                runOnUiThread {
-                    result.error(it.toString(), it.message, null)
-                }
-            })
-            .discard()
+            if (identifier == null || entryJson == null) {
+                result.error(
+                    PolarErrorCode.INVALID_ARGUMENT,
+                    "Invalid arguments provided",
+                    null
+                )
+                return
+            }
+
+            val entry = gson.fromJson(entryJson, PolarExerciseEntry::class.java)
+            wrapper.api.removeExercise(identifier, entry)
+                .subscribe(
+                    { result.success(null) },
+                    { error ->
+                        val code = when (error) {
+                            is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                            is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                            else -> PolarErrorCode.BLUETOOTH_ERROR
+                        }
+                        result.error(code, error.message, null)
+                    }
+                )
+        } catch (e: JsonSyntaxException) {
+            result.error(
+                PolarErrorCode.INVALID_ARGUMENT,
+                "Failed to decode exercise entry",
+                null
+            )
+        }
     }
 
     private fun setLedConfig(

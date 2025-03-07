@@ -865,40 +865,55 @@ class Polar {
     DateTime fromDate,
     DateTime toDate,
   ) async {
-    final response = await _channel.invokeMethod(
-      'getSleep',
-      [
-        identifier,
-        fromDate.toIso8601String().split('T')[0],
-        toDate.toIso8601String().split('T')[0],
-      ],
-    );
-    print('Response content: $response');
-    print('Response type: ${response.runtimeType}');
-
-    if (response == null) return [];
-    
     try {
-      final dynamic parsedResponse = jsonDecode(response as String);
-      
-      if (parsedResponse is List) {
-        print('Handling as List');
-        print('First item in list: ${parsedResponse.first}');
-        return parsedResponse
-            .where((data) => data['result'] != null && data['result'].isNotEmpty)
-            .map((data) {
-              final convertedMap = _convertToStringDynamicMap(data as Map<Object?, Object?>);
-              print('Converted map: $convertedMap');
-              return PolarSleepData.fromJson(convertedMap);
-            })
+      // Validate dates
+      if (fromDate.isAfter(toDate)) {
+        throw PolarDataException('fromDate must be before toDate');
+      }
+
+      if (fromDate.isAfter(DateTime.now())) {
+        throw PolarDataException('fromDate cannot be in the future');
+      }
+
+      final fromDateStr = fromDate.toIso8601String().split('T')[0];
+      final toDateStr = toDate.toIso8601String().split('T')[0];
+
+      final response = await _channel.invokeMethod(
+        'getSleep',
+        [
+          identifier,
+          fromDateStr,
+          toDateStr,
+        ],
+      );
+
+      if (response == null) return [];
+
+      if (response is String) {
+        final List<dynamic> parsed = jsonDecode(response);
+        return parsed
+            .map((json) => PolarSleepData.fromJson(json as Map<String, dynamic>))
             .toList();
       }
-      print('Unhandled response type');
-      return [];
+
+      if (response is List) {
+        return response
+            .map((data) => PolarSleepData.fromJson(Map<String, dynamic>.from(data)))
+            .toList();
+      }
+
+      throw PolarDataException('Unexpected response type: ${response.runtimeType}');
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarNotSupportedException('Sleep tracking not supported on device $identifier', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to get sleep data: ${e.message}', e);
+      }
     } catch (e) {
-      print('Error parsing sleep data: $e');
-      print('Raw response: $response');
-      return [];
+      throw PolarDataException('Error processing sleep data: $e');
     }
   }
 

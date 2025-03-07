@@ -5,6 +5,9 @@ on:
     branches:
       - master
 
+env:
+  PUB_CACHE: ~/.pub-cache
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

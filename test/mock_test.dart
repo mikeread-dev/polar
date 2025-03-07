@@ -1,3 +1,5 @@
+// ignore_for_file: require_trailing_commas
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -186,7 +188,7 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
                 'x': 1,
                 'y': 1,
                 'z': 1
-              }
+              },
             ]
           },
           'startTime': {

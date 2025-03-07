@@ -14,11 +14,10 @@ buildscript {
     }
 }
 
-rootProject.allprojects {
+allprojects {
     repositories {
         google()
         mavenCentral()
-
         maven { url 'https://jitpack.io' }
     }
 }
@@ -43,10 +42,9 @@ android {
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 
-    // Dependencies for Polar SDK
-    implementation 'com.github.polarofficial:polar-ble-sdk:5.14.0'  // Make sure you have the latest version
+    // Update the Polar SDK dependency to the latest version that matches your iOS version
+    implementation 'com.github.polarofficial:polar-ble-sdk:5.14.0'
     implementation 'io.reactivex.rxjava3:rxjava:3.1.6'
     implementation 'io.reactivex.rxjava3:rxandroid:3.0.2'
-
     implementation 'com.google.code.gson:gson:2.10'
 }

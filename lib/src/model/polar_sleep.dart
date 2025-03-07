@@ -1,6 +1,6 @@
+// Remove the ignore directive since the file has proper documentation
+
 import 'package:json_annotation/json_annotation.dart';
-import 'package:polar/src/model/converters.dart';
-import 'package:polar/src/model/polar_sleep_stage.dart';
 
 part 'polar_sleep.g.dart';
 
@@ -15,42 +15,66 @@ class PolarSleepData {
   @JsonKey(name: 'result')
   final SleepAnalysisResult? analysis;
 
+  /// Creates a new [PolarSleepData] instance
+  /// 
+  /// Parameters:
+  /// - [date]: The date for which sleep data was recorded
+  /// - [analysis]: Detailed analysis of sleep patterns and stages
   PolarSleepData({
     this.date,
     this.analysis,
   });
 
-  factory PolarSleepData.fromJson(Map<String, dynamic> json) {
-    return PolarSleepData(
-      date: json['date'] == null ? null : DateTime.parse(json['date'] as String),
-      analysis: json['result'] == null
-          ? null
-          : SleepAnalysisResult.fromJson(json['result'] as Map<String, dynamic>),
-    );
-  }
+  // Ignore as fromJson is obvious
+  // ignore: public_member_api_docs
+  factory PolarSleepData.fromJson(Map<String, dynamic> json) =>
+      _$PolarSleepDataFromJson(json);
 
-  Map<String, dynamic> toJson() => {
-        'date': date?.toIso8601String(),
-        'result': analysis?.toJson(),
-      };
+// Ignore as fromJson is obvious
+  // ignore: public_member_api_docs
+  Map<String, dynamic> toJson() => _$PolarSleepDataToJson(this);
 }
 
 /// Contains the results of sleep analysis including total sleep duration,
 /// continuous sleep duration, and detailed sleep intervals with sleep stages
 @JsonSerializable()
 class SleepAnalysisResult {
+  /// Indicates whether the device's battery ran out during sleep tracking
   final bool? batteryRanOut;
+
+  /// The unique identifier of the Polar device
   final String? deviceId;
+
+  /// The timestamp when this sleep data was last modified
   final DateTime? lastModified;
+
+  /// List of sleep cycles detected during the sleep period
   final List<SleepCycle>? sleepCycles;
+
+  /// Number of seconds from the reference point to sleep end time
   final int? sleepEndOffsetSeconds;
+
+  /// The time when sleep ended
   final DateTime? sleepEndTime;
+
+  /// The user's sleep goal in minutes
   final int? sleepGoalMinutes;
+
+  /// The date for which this sleep result was recorded
   final DateTime? sleepResultDate;
+
+  /// Number of seconds from the reference point to sleep start time
   final int? sleepStartOffsetSeconds;
+
+  /// The time when sleep started
   final DateTime? sleepStartTime;
+
+  /// List of sleep and wake phases detected during the sleep period
   final List<SleepWakePhase>? sleepWakePhases;
 
+  /// Creates a new [SleepAnalysisResult] instance
+  /// 
+  /// Contains detailed sleep analysis data including timing, phases, and device information
   SleepAnalysisResult({
     this.batteryRanOut,
     this.deviceId,
@@ -65,6 +89,12 @@ class SleepAnalysisResult {
     this.sleepWakePhases,
   });
 
+  /// Creates a [SleepAnalysisResult] from a JSON map
+  /// 
+  /// Parameters:
+  /// - [json]: A map containing the sleep analysis data
+  /// 
+  /// Returns a new [SleepAnalysisResult] instance with the parsed JSON data
   factory SleepAnalysisResult.fromJson(Map<String, dynamic> json) {
     return SleepAnalysisResult(
       batteryRanOut: json['batteryRanOut'] as bool?,
@@ -93,6 +123,9 @@ class SleepAnalysisResult {
     );
   }
 
+  /// Converts the [SleepAnalysisResult] instance to a JSON map
+  /// 
+  /// Returns a [Map] containing the sleep analysis data in a JSON-compatible format
   Map<String, dynamic> toJson() => {
         'batteryRanOut': batteryRanOut,
         'deviceId': deviceId,
@@ -108,34 +141,66 @@ class SleepAnalysisResult {
       };
 }
 
+/// Represents a single sleep cycle with timing and depth information
+/// 
+/// A sleep cycle contains information about when it occurred relative to sleep start
+/// and how deep the sleep was at the beginning of the cycle
 @JsonSerializable()
 class SleepCycle {
+  /// Number of seconds elapsed since the start of sleep
   final int secondsFromSleepStart;
+
+  /// The depth of sleep at the beginning of this cycle
+  /// 
+  /// Higher values indicate deeper sleep states
   final double sleepDepthStart;
 
+  /// Creates a new [SleepCycle] instance
+  /// 
+  /// Parameters:
+  /// - [secondsFromSleepStart]: Number of seconds from the start of sleep
+  /// - [sleepDepthStart]: The depth of sleep at the start of this cycle
   SleepCycle({
     required this.secondsFromSleepStart,
     required this.sleepDepthStart,
   });
 
+  /// Creates a [SleepCycle] instance from a JSON map
   factory SleepCycle.fromJson(Map<String, dynamic> json) =>
       _$SleepCycleFromJson(json);
 
+  /// Converts the [SleepCycle] instance to a JSON map
   Map<String, dynamic> toJson() => _$SleepCycleToJson(this);
 }
 
+/// Represents a phase of sleep or wakefulness during the sleep period
+/// 
+/// Each phase contains information about when it occurred relative to sleep start
+/// and the state of sleep/wakefulness during that phase
 @JsonSerializable()
 class SleepWakePhase {
+  /// Number of seconds elapsed since the start of sleep when this phase began
   final int secondsFromSleepStart;
+
+  /// The state of sleep or wakefulness during this phase
+  /// 
+  /// Can be one of the sleep stages defined in [PolarSleepStage]
   final String state;
 
+  /// Creates a new [SleepWakePhase] instance
+  /// 
+  /// Parameters:
+  /// - [secondsFromSleepStart]: Number of seconds from the start of sleep
+  /// - [state]: The sleep state during this phase
   SleepWakePhase({
     required this.secondsFromSleepStart,
     required this.state,
   });
 
+  /// Creates a [SleepWakePhase] instance from a JSON map
   factory SleepWakePhase.fromJson(Map<String, dynamic> json) =>
       _$SleepWakePhaseFromJson(json);
 
+  /// Converts the [SleepWakePhase] instance to a JSON map
   Map<String, dynamic> toJson() => _$SleepWakePhaseToJson(this);
 }
