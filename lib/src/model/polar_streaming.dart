@@ -261,12 +261,14 @@ class PolarPpgData extends PolarStreamingData<PolarPpgSample> {
   Map<String, dynamic> toJson() => _$PolarPpgDataToJson(this);
 }
 
-/// Represents a single PPI (Pulse to Pulse Interval) sample from a Polar device.
-/// 
 /// PPI measurements provide detailed information about heart rate variability
 /// and the quality of the measurements.
 @JsonSerializable()
 class PolarPpiSample {
+  /// Moment sample is taken in nanoseconds. The epoch of timestamp is 1.1.2000
+  @PolarSampleTimestampConverter()
+  final DateTime timeStamp;
+
   /// Pulse to Pulse interval in milliseconds.
   /// 
   /// The value indicates the quality of PP-intervals:
@@ -312,6 +314,7 @@ class PolarPpiSample {
 
   /// Constructor
   PolarPpiSample({
+    required this.timeStamp,
     required this.ppi,
     required this.errorEstimate,
     required this.hr,
@@ -323,6 +326,7 @@ class PolarPpiSample {
   /// From json
   factory PolarPpiSample.fromJson(Map<String, dynamic> json) {
     return PolarPpiSample(
+      timeStamp: const PolarSampleTimestampConverter().fromJson(json['timeStamp']),
       ppi: _readPpi(json, 'ppi') as int,
       errorEstimate: _readErrorEstimate(json, 'errorEstimate') as int,
       hr: (json['hr'] as num).toInt(),
@@ -334,6 +338,7 @@ class PolarPpiSample {
 
   /// To json
   Map<String, dynamic> toJson() => {
+    'timeStamp': const PolarSampleTimestampConverter().toJson(timeStamp),
     'ppi': ppi,
     'errorEstimate': errorEstimate,
     'hr': hr,

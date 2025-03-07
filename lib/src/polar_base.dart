@@ -728,6 +728,7 @@ class Polar {
       'getOfflineRecord',
       [identifier, jsonEncode(entry.toJson())],
     );
+    print("Raw Ppi result: $result");
     if (result == null) return null;
     final data = jsonDecode(result);
     return PpiOfflineRecording.fromJson(data);
@@ -917,19 +918,19 @@ class Polar {
     }
   }
 
-  Map<String, dynamic> _convertToStringDynamicMap(Map<Object?, Object?> map) {
-    return map.map((key, value) {
-      if (value is Map<Object?, Object?>) {
-        return MapEntry(key.toString(), _convertToStringDynamicMap(value));
-      } else if (value is List) {
-        return MapEntry(key.toString(), value.map((e) {
-          if (e is Map<Object?, Object?>) {
-            return _convertToStringDynamicMap(e);
-          }
-          return e;
-        }).toList());
-      }
-      return MapEntry(key.toString(), value);
-    });
-  }
+  // Map<String, dynamic> _convertToStringDynamicMap(Map<Object?, Object?> map) {
+  //   return map.map((key, value) {
+  //     if (value is Map<Object?, Object?>) {
+  //       return MapEntry(key.toString(), _convertToStringDynamicMap(value));
+  //     } else if (value is List) {
+  //       return MapEntry(key.toString(), value.map((e) {
+  //         if (e is Map<Object?, Object?>) {
+  //           return _convertToStringDynamicMap(e);
+  //         }
+  //         return e;
+  //       }).toList());
+  //     }
+  //     return MapEntry(key.toString(), value);
+  //   });
+  // }
 }
