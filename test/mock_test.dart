@@ -283,6 +283,7 @@ class StreamingHandler extends MockStreamHandler {
         data = PolarPpiData(
           samples: [
             PolarPpiSample(
+              timeStamp: DateTime.now(),
               ppi: 0,
               errorEstimate: 0,
               hr: 0,
