@@ -1,7 +1,14 @@
 import 'package:flutter/services.dart';
 import 'exceptions.dart';
 
+/// Maps platform-specific errors to Polar SDK exceptions
 class PolarErrorMapper {
+  /// Converts a [PlatformException] to the appropriate [PolarException]
+  /// 
+  /// Parameters:
+  ///   - [e]: The platform exception to convert
+  /// 
+  /// Returns the appropriate Polar exception based on the error code
   static Exception mapPlatformError(PlatformException e) {
     switch (e.code) {
       case 'device_disconnected':

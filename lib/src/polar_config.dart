@@ -1,10 +1,21 @@
+/// Configuration class for Polar SDK settings
 class PolarConfig {
+  /// Timeout duration for device connections
   final Duration connectionTimeout;
+
+  /// Timeout duration for streaming operations
   final Duration streamingTimeout;
+
+  /// Whether to automatically attempt to reconnect if connection is lost
   final bool autoReconnect;
+
+  /// Whether to handle Bluetooth permissions automatically
   final bool handlePermissions;
+
+  /// Level of logging to output
   final LogLevel logLevel;
 
+  /// Creates a new [PolarConfig] with the given parameters
   const PolarConfig({
     this.connectionTimeout = const Duration(seconds: 30),
     this.streamingTimeout = const Duration(seconds: 10),
@@ -14,4 +25,5 @@ class PolarConfig {
   });
 }
 
+/// Available logging levels for the Polar SDK
 enum LogLevel { debug, info, warning, error }

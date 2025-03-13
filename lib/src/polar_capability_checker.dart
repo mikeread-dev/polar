@@ -1,6 +1,15 @@
 import 'package:polar/polar.dart';
 
+/// Utility class for checking Polar device capabilities and feature support
 class PolarCapabilityChecker {
+  /// Checks if a specific feature is supported by a Polar device
+  /// 
+  /// Parameters:
+  ///   - [identifier]: Polar device id or address
+  ///   - [feature]: The feature to check for support
+  ///   - [polar]: Instance of the Polar API
+  /// 
+  /// Returns true if the feature is supported, false otherwise
   static Future<bool> isFeatureSupported(
     String identifier,
     PolarSdkFeature feature,
