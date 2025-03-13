@@ -729,7 +729,6 @@ class Polar {
       'getOfflineRecord',
       [identifier, jsonEncode(entry.toJson())],
     );
-    print("Raw Ppi result: $result");
     if (result == null) return null;
     final data = jsonDecode(result);
     return PpiOfflineRecording.fromJson(data);

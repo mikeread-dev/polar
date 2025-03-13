@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:polar/polar.dart';
 import 'package:polar/src/model/polar_offline_recording_data.dart';
-
+import 'package:flutter/foundation.dart';
 import 'tests.dart';
 
 const identifier = 'asdf';
@@ -67,8 +67,6 @@ final offlineRecordings = <PolarOfflineRecordingEntry>[];
 var diskSpace = [14416896, 14369729];
 
 Future<dynamic> handleMethodCall(MethodCall methodCall) async {
-  print('Method called: ${methodCall.method}');
-  print('Arguments: ${methodCall.arguments}');
   
   switch (methodCall.method) {
     case 'connectToDevice':
@@ -238,7 +236,7 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
         }
       ];
     default:
-      print('Unimplemented method: ${methodCall.method}');
+      debugPrint('Unimplemented method: ${methodCall.method}');
       throw UnimplementedError();
   }
 }

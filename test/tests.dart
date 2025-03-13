@@ -335,10 +335,10 @@ void testSleepData(String identifier) {
           fromDate,
           toDate,
         );
-        print('Sleep data success: $sleepData');
+        debugPrint('Sleep data success: $sleepData');
       } catch (e, stackTrace) {
-        print('Sleep data error: $e');
-        print('Stack trace: $stackTrace');
+        debugPrint('Sleep data error: $e');
+        debugPrint('Stack trace: $stackTrace');
       }
     });
   });
