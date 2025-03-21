@@ -25,7 +25,7 @@ void main() {
 
     test('Version format is valid', () {
       // Verify version string follows semantic versioning (major.minor.patch)
-      final version = PolarVersionCompatibility.currentSdkVersion;
+      const version = PolarVersionCompatibility.currentSdkVersion;
       final parts = version.split('.');
       expect(parts.length, 3);
       expect(parts.every((part) => int.tryParse(part) != null), true);

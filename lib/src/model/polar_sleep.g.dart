@@ -24,6 +24,7 @@ Map<String, dynamic> _$PolarSleepDataToJson(PolarSleepData instance) =>
       'result': instance.analysis,
     };
 
+// ignore: unused_element
 SleepAnalysisResult _$SleepAnalysisResultFromJson(Map<String, dynamic> json) =>
     SleepAnalysisResult(
       batteryRanOut: json['batteryRanOut'] as bool?,
@@ -52,6 +53,7 @@ SleepAnalysisResult _$SleepAnalysisResultFromJson(Map<String, dynamic> json) =>
           .toList(),
     );
 
+// ignore: unused_element
 Map<String, dynamic> _$SleepAnalysisResultToJson(
         SleepAnalysisResult instance) =>
     <String, dynamic>{

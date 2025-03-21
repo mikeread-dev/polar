@@ -6,7 +6,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:polar/polar.dart';
-import 'package:polar/src/exceptions.dart';
 import 'package:polar/src/model/convert.dart';
 import 'package:polar/src/model/polar_offline_recording_data.dart';
 

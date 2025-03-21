@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'exceptions.dart';
+import 'package:polar/src/exceptions.dart';
 
 /// Maps platform-specific errors to Polar SDK exceptions
 class PolarErrorMapper {
