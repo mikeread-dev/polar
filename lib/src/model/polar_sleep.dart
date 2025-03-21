@@ -18,12 +18,12 @@ class PolarSleepData {
   /// Creates a new [PolarSleepData] instance
   /// 
   /// Parameters:
-  /// - [date]: The date for which sleep data was recorded
+  /// - [date]: The date for which sleep data was recorded (will be converted to UTC)
   /// - [analysis]: Detailed analysis of sleep patterns and stages
   PolarSleepData({
-    this.date,
+    DateTime? date,
     this.analysis,
-  });
+  }) : date = date?.toUtc();
 
   // Ignore as fromJson is obvious
   // ignore: public_member_api_docs
@@ -75,19 +75,24 @@ class SleepAnalysisResult {
   /// Creates a new [SleepAnalysisResult] instance
   /// 
   /// Contains detailed sleep analysis data including timing, phases, and device information
+  /// All DateTime values are converted to UTC
   SleepAnalysisResult({
     this.batteryRanOut,
     this.deviceId,
-    this.lastModified,
+    DateTime? lastModified,
     this.sleepCycles,
     this.sleepEndOffsetSeconds,
-    this.sleepEndTime,
+    DateTime? sleepEndTime,
     this.sleepGoalMinutes,
-    this.sleepResultDate,
+    DateTime? sleepResultDate,
     this.sleepStartOffsetSeconds,
-    this.sleepStartTime,
+    DateTime? sleepStartTime,
     this.sleepWakePhases,
-  });
+  }) : 
+    lastModified = lastModified?.toUtc(),
+    sleepEndTime = sleepEndTime?.toUtc(),
+    sleepResultDate = sleepResultDate?.toUtc(),
+    sleepStartTime = sleepStartTime?.toUtc();
 
   /// Creates a [SleepAnalysisResult] from a JSON map
   /// 
@@ -95,28 +100,29 @@ class SleepAnalysisResult {
   /// - [json]: A map containing the sleep analysis data
   /// 
   /// Returns a new [SleepAnalysisResult] instance with the parsed JSON data
+  /// All DateTime values are converted to UTC
   factory SleepAnalysisResult.fromJson(Map<String, dynamic> json) {
     return SleepAnalysisResult(
       batteryRanOut: json['batteryRanOut'] as bool?,
       deviceId: json['deviceId'] as String?,
       lastModified: json['lastModified'] == null
           ? null
-          : DateTime.parse(json['lastModified'] as String),
+          : DateTime.parse(json['lastModified'] as String).toUtc(),
       sleepCycles: (json['sleepCycles'] as List<dynamic>?)
           ?.map((e) => SleepCycle.fromJson(e as Map<String, dynamic>))
           .toList(),
       sleepEndOffsetSeconds: json['sleepEndOffsetSeconds'] as int?,
       sleepEndTime: json['sleepEndTime'] == null
           ? null
-          : DateTime.parse(json['sleepEndTime'] as String),
+          : DateTime.parse(json['sleepEndTime'] as String).toUtc(),
       sleepGoalMinutes: json['sleepGoalMinutes'] as int?,
       sleepResultDate: json['sleepResultDate'] == null
           ? null
-          : DateTime.parse(json['sleepResultDate'] as String),
+          : DateTime.parse(json['sleepResultDate'] as String).toUtc(),
       sleepStartOffsetSeconds: json['sleepStartOffsetSeconds'] as int?,
       sleepStartTime: json['sleepStartTime'] == null
           ? null
-          : DateTime.parse(json['sleepStartTime'] as String),
+          : DateTime.parse(json['sleepStartTime'] as String).toUtc(),
       sleepWakePhases: (json['sleepWakePhases'] as List<dynamic>?)
           ?.map((e) => SleepWakePhase.fromJson(e as Map<String, dynamic>))
           .toList(),
