@@ -28,7 +28,7 @@ class AccOfflineRecording extends PolarOfflineRecordingData {
   AccOfflineRecording({
     required this.data,
     required DateTime startTime,
-    required super.settings,
+    super.settings,
   }) : super(startTime: startTime.toUtc());
 
   /// Factory method to create an instance from JSON.
@@ -40,7 +40,7 @@ class AccOfflineRecording extends PolarOfflineRecordingData {
           : const MapToDateTimeConverter().fromJson(
               json['startTime'],
             ),
-      settings: PolarSensorSetting.fromJson(json['settings']),
+      settings: json['settings'] != null ? PolarSensorSetting.fromJson(json['settings']) : null,
     );
   }
 }
@@ -70,6 +70,31 @@ class PpiOfflineRecording extends PolarOfflineRecordingData {
   }
 }
 
+/// A class representing HR (Heart Rate) offline recording data from a Polar device,
+/// extending the generic [PolarOfflineRecordingData].
+class HrOfflineRecording extends PolarOfflineRecordingData {
+  /// The HR data.
+  final PolarHrData data;
+
+  /// Constructor for [HrOfflineRecording].
+  HrOfflineRecording({
+    required this.data,
+    required DateTime startTime,
+    super.settings,
+  }) : super(startTime: startTime.toUtc());
+
+  /// Factory method to create an instance from JSON.
+  factory HrOfflineRecording.fromJson(Map<String, dynamic> json) {
+    return HrOfflineRecording(
+      data: PolarHrData.fromJson(json['data']),
+      startTime: Platform.isIOS
+          ? DateTime.fromMillisecondsSinceEpoch(json['startTime'])
+          : const MapToDateTimeConverter().fromJson(json['startTime']),
+      settings: json['settings'] != null ? PolarSensorSetting.fromJson(json['settings']) : null,
+    );
+  }
+}
+
 /// A class representing PPI (Peak-to-Peak Interval) offline recording data from a Polar device,
 /// extending the generic [PolarOfflineRecordingData].
 class PpgOfflineRecording extends PolarOfflineRecordingData {
@@ -80,7 +105,7 @@ class PpgOfflineRecording extends PolarOfflineRecordingData {
   PpgOfflineRecording({
     required this.data,
     required DateTime startTime,
-    required super.settings,
+    super.settings,
   }) : super(startTime: startTime.toUtc());
 
   /// Factory method to create an instance from JSON.
@@ -90,7 +115,7 @@ class PpgOfflineRecording extends PolarOfflineRecordingData {
       startTime: Platform.isIOS
           ? const PolarSampleTimestampConverter().fromJson(json['startTime'])
           : const MapToDateTimeConverter().fromJson(json['startTime']),
-      settings: PolarSensorSetting.fromJson(json['settings']),
+      settings: json['settings'] != null ? PolarSensorSetting.fromJson(json['settings']) : null,
     );
   }
 }

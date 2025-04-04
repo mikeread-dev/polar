@@ -313,7 +313,10 @@ class StreamingHandler extends MockStreamHandler {
           samples: [
             PolarHrSample(
               hr: 0,
+              correctedHr: 0,
+              ppgQuality: 0,
               rrsMs: [],
+              rrAvailable: false,
               contactStatus: false,
               contactStatusSupported: false,
             ),

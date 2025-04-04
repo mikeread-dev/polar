@@ -30,6 +30,7 @@ import com.polar.sdk.api.model.PolarHrData
 import com.polar.sdk.api.model.PolarSensorSetting
 import com.polar.sdk.api.model.PolarOfflineRecordingEntry
 import com.polar.sdk.api.model.sleep.PolarSleepData
+import com.polar.androidcommunications.api.ble.model.gatt.client.ChargeState
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -997,6 +998,14 @@ class PolarWrapper @OptIn(ExperimentalStdlibApi::class) constructor(
         level: Int,
     ) {
         invoke("batteryLevelReceived", listOf(identifier, level))
+    }
+
+    override fun batteryChargingStatusReceived(
+        identifier: String, 
+        chargingStatus: ChargeState
+    ) {
+        // TODO: Implement this if needed
+        // For now, we're just providing a stub implementation
     }
 
     @Deprecated("", replaceWith = ReplaceWith(""))

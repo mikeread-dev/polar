@@ -27,9 +27,12 @@ Map<String, dynamic> _$PolarStreamingDataToJson<T>(
 PolarHrSample _$PolarHrSampleFromJson(Map<String, dynamic> json) =>
     PolarHrSample(
       hr: (json['hr'] as num).toInt(),
+      correctedHr: (json['correctedHr'] as num? ?? 0).toInt(),
+      ppgQuality: (json['ppgQuality'] as num? ?? 0).toInt(),
       rrsMs: (json['rrsMs'] as List<dynamic>)
           .map((e) => (e as num).toInt())
           .toList(),
+      rrAvailable: json['rrAvailable'] as bool? ?? false,
       contactStatus: json['contactStatus'] as bool,
       contactStatusSupported: json['contactStatusSupported'] as bool,
     );
@@ -37,7 +40,10 @@ PolarHrSample _$PolarHrSampleFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$PolarHrSampleToJson(PolarHrSample instance) =>
     <String, dynamic>{
       'hr': instance.hr,
+      'correctedHr': instance.correctedHr,
+      'ppgQuality': instance.ppgQuality,
       'rrsMs': instance.rrsMs,
+      'rrAvailable': instance.rrAvailable,
       'contactStatus': instance.contactStatus,
       'contactStatusSupported': instance.contactStatusSupported,
     };

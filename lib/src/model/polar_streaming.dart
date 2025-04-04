@@ -80,8 +80,17 @@ class PolarHrSample {
   /// hr in BPM
   final int hr;
 
+  /// corrected hr in BPM
+  final int correctedHr;
+
+  /// ppg quality
+  final int ppgQuality;
+
   /// rrs RR interval in ms.
   final List<int> rrsMs;
+
+  /// rr available
+  final bool rrAvailable;
 
   /// contact status between the device and the users skin
   final bool contactStatus;
@@ -92,7 +101,10 @@ class PolarHrSample {
   /// Constructor
   PolarHrSample({
     required this.hr,
+    required this.correctedHr,
+    required this.ppgQuality,
     required this.rrsMs,
+    required this.rrAvailable,
     required this.contactStatus,
     required this.contactStatusSupported,
   });
