@@ -133,3 +133,25 @@ class PolarRecordingException extends PolarException {
   /// Creates a new [PolarRecordingException] with the given [message] and optional [cause]
   PolarRecordingException(super.message, [super.cause]);
 }
+
+/// Thrown when a file or directory is not found
+/// 
+/// This occurs when:
+/// - Requested file doesn't exist on the device
+/// - Path is invalid
+/// - File was deleted or moved
+class PolarFileNotFoundException extends PolarException {
+  /// Creates a new [PolarFileNotFoundException] with the given [message] and optional [cause]
+  PolarFileNotFoundException(super.message, [super.cause]);
+}
+
+/// Thrown when an operation is not supported by the device
+/// 
+/// This occurs when:
+/// - The device doesn't support the specific operation
+/// - The firmware version doesn't implement the feature
+/// - The operation is prohibited by device limitations
+class PolarOperationNotSupportedException extends PolarException {
+  /// Creates a new [PolarOperationNotSupportedException] with the given [message] and optional [cause]
+  PolarOperationNotSupportedException(super.message, [super.cause]);
+}

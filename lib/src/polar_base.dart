@@ -625,15 +625,19 @@ class Polar {
       );
     } on PlatformException catch (e) {
       switch (e.code) {
+        case 'NO_SUCH_FILE_OR_DIRECTORY':
+          throw PolarFileNotFoundException('The offline record file was not found: ${e.message}', e);
         case 'device_disconnected':
           throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
         case 'not_supported':
-          throw PolarNotSupportedException('Not supported', e);
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
         default:
-          throw PolarBluetoothOperationException('Operation failed: ${e.message}', e);
+          throw PolarBluetoothOperationException('Failed to start offline recording: ${e.message}', e);
       }
     } catch (e) {
-      throw PolarDataException('Error processing sleep data: $e');
+      throw PolarDataException('Error starting offline recording: $e');
     }
   }
 
@@ -655,7 +659,18 @@ class Polar {
         [identifier, feature.toJson()],
       );
     } on PlatformException catch (e) {
-      throw PolarBluetoothOperationException('Failed to stop offline recording: ${e.message}', e);
+      switch (e.code) {
+        case 'NO_SUCH_FILE_OR_DIRECTORY':
+          throw PolarFileNotFoundException('The offline record file was not found: ${e.message}', e);
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device disconnected while stopping recording: ${e.message}', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to stop offline recording: ${e.message}', e);
+      }
     } catch (e) {
       throw PolarDataException('Error stopping offline recording: $e');
     }
@@ -776,6 +791,7 @@ class Polar {
   ///   - entry: The entry representing the offline recording to fetch.
   /// - Returns: Recording data in JSON format.
   ///   - success: Returns the fetched recording data.
+  ///   - onError: Possible errors are returned as exceptions.
   Future<HrOfflineRecording?> getOfflineHrRecord(
     String identifier,
     PolarOfflineRecordingEntry entry,
@@ -840,7 +856,18 @@ class Polar {
         [identifier, jsonEncode(entry.toJson())],
       );
     } on PlatformException catch (e) {
-      throw PolarBluetoothOperationException('Failed to remove offline record: ${e.message}', e);
+      switch (e.code) {
+        case 'NO_SUCH_FILE_OR_DIRECTORY':
+          throw PolarFileNotFoundException('The offline record file was not found: ${e.message}', e);
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device disconnected while removing record: ${e.message}', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to remove offline record: ${e.message}', e);
+      }
     } catch (e) {
       throw PolarDataException('Error removing offline record: $e');
     }

@@ -581,9 +581,16 @@ class PolarPlugin :
             .startOfflineRecording(identifier, feature, settings)
             .subscribe({
                 runOnUiThread { result.success(null) }
-            }, {
+            }, { error ->
                 runOnUiThread {
-                    result.error("ERROR_STARTING_RECORDING", it.message, null)
+                    val errorCode = when {
+                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> "ERROR_STARTING_RECORDING"
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()
@@ -598,9 +605,16 @@ class PolarPlugin :
             .stopOfflineRecording(identifier, feature)
             .subscribe({
                 runOnUiThread { result.success(null) }
-            }, {
+            }, { error ->
                 runOnUiThread {
-                    result.error("ERROR_STOPPING_RECORDING", it.message, null)
+                    val errorCode = when {
+                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> "ERROR_STOPPING_RECORDING"
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()
@@ -667,9 +681,16 @@ class PolarPlugin :
             .removeOfflineRecord(identifier, entry)
             .subscribe({
                 runOnUiThread { result.success(null) }
-            }, {
+            }, { error ->
                 runOnUiThread {
-                    result.error(it.toString(), it.message, null)
+                    val errorCode = when {
+                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> "ERROR_REMOVING_RECORD"
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()
