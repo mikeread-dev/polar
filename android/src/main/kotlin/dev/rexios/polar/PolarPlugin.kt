@@ -43,6 +43,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.reactivex.rxjava3.disposables.Disposable
+import io.reactivex.rxjava3.core.Completable
 import java.lang.reflect.Type
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,6 +54,8 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import com.polar.sdk.api.errors.PolarDeviceDisconnected
 import com.polar.sdk.api.errors.PolarOperationNotSupported
+import io.reactivex.rxjava3.plugins.RxJavaPlugins
+import io.reactivex.rxjava3.exceptions.OnErrorNotImplementedException
 
 fun Any?.discard() = Unit
 
@@ -110,6 +113,11 @@ class PolarPlugin :
     // Streaming channels
     private val streamingChannels = mutableMapOf<String, StreamingChannel>()
 
+    // Add a companion object to the PolarPlugin class with a TAG constant
+    companion object {
+        private const val TAG = "PolarPlugin"
+    }
+    
     // Apparently you have to call invokeMethod on the UI thread
     private fun invokeOnUiThread(
         method: String,
@@ -123,6 +131,26 @@ class PolarPlugin :
         invokeOnUiThread(method, arguments)
     }
 
+    // Add this method to set up RxJava error handling
+    private fun setupRxErrorHandling() {
+        // This prevents RxJava from crashing the app when errors aren't handled
+        RxJavaPlugins.setErrorHandler { e: Throwable ->
+            when {
+                e is OnErrorNotImplementedException && e.cause?.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> {
+                    // This is the specific error we're seeing
+                    println("[PolarPlugin] Safely caught NO_SUCH_FILE_OR_DIRECTORY exception: ${e.cause?.message}")
+                }
+                e is OnErrorNotImplementedException -> {
+                    println("[PolarPlugin] Caught undeliverable RxJava exception: ${e.cause?.message ?: e.message}")
+                }
+                else -> {
+                    println("[PolarPlugin] Caught RxJava error: ${e.message}")
+                }
+            }
+            // Don't propagate the error - this prevents crashes
+        }
+    }
+
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         messenger = flutterPluginBinding.binaryMessenger
 
@@ -133,6 +161,9 @@ class PolarPlugin :
         searchChannel.setStreamHandler(searchHandler)
 
         context = flutterPluginBinding.applicationContext
+        
+        // Set up RxJava error handling
+        setupRxErrorHandling()
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -544,6 +575,7 @@ class PolarPlugin :
 
         wrapper.api
             .getAvailableOfflineRecordingDataTypes(identifier)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({
                 runOnUiThread { result.success(gson.toJson(it)) }
             }, {
@@ -561,6 +593,7 @@ class PolarPlugin :
 
         wrapper.api
             .requestOfflineRecordingSettings(identifier, feature)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({
                 runOnUiThread { result.success(gson.toJson(it)) }
             }, {
@@ -577,23 +610,50 @@ class PolarPlugin :
         val feature = gson.fromJson(arguments[1] as String, PolarDeviceDataType::class.java)
         val settings = gson.fromJson(arguments[2] as String, PolarSensorSetting::class.java)
 
-        wrapper.api
-            .startOfflineRecording(identifier, feature, settings)
-            .subscribe({
-                runOnUiThread { result.success(null) }
-            }, { error ->
-                runOnUiThread {
-                    val errorCode = when {
-                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
-                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
-                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
-                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
-                        else -> "ERROR_STARTING_RECORDING"
-                    }
-                    result.error(errorCode, error.message, null)
+        try {
+            wrapper.api
+                .startOfflineRecording(identifier, feature, settings)
+                .doOnError { error ->
+                    System.err.println("Error in startOfflineRecording: " + error.message)
                 }
-            })
-            .discard()
+                .onErrorResumeNext { error ->
+                    runOnUiThread {
+                        val errorCode = when {
+                            error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                            error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                            error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                            error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                            else -> "ERROR_STARTING_RECORDING"
+                        }
+                        result.error(errorCode, error.message, null)
+                    }
+                    Completable.complete() // Return a completed Completable to prevent error propagation
+                }
+                .subscribe({
+                    runOnUiThread { result.success(null) }
+                }, { error ->
+                    // This should only be called if onErrorResumeNext somehow fails
+                    runOnUiThread {
+                        System.err.println("Error in subscribe: " + error.message)
+                        result.error("UNEXPECTED_ERROR", error.message, null)
+                    }
+                })
+                .discard()
+        } catch (e: Exception) {
+            // Catch any exceptions that might occur before the RxJava chain even starts
+            val errorCode = when {
+                e.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                e is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                e is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                e.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                else -> "ERROR_STARTING_RECORDING"
+            }
+            
+            runOnUiThread {
+                System.err.println("Exception before RxJava chain: " + e.message)
+                result.error(errorCode, e.message, null)
+            }
+        }
     }
 
     private fun stopOfflineRecording(call: MethodCall, result: Result) {
@@ -603,6 +663,7 @@ class PolarPlugin :
 
         wrapper.api
             .stopOfflineRecording(identifier, feature)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({
                 runOnUiThread { result.success(null) }
             }, { error ->
@@ -626,12 +687,20 @@ class PolarPlugin :
 
         wrapper.api
             .getOfflineRecordingStatus(identifier)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({ dataTypes ->
                 val dataTypeNames = dataTypes.map { it.name }
                 runOnUiThread { result.success(dataTypeNames) }
-            }, {
+            }, { error ->
                 runOnUiThread {
-                    result.error(it.toString(), it.message, null)
+                    val errorCode = when {
+                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> "ERROR_STOPPING_RECORDING"
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()
@@ -643,6 +712,7 @@ class PolarPlugin :
         val recordings = mutableListOf<String>()
         wrapper.api
             .listOfflineRecordings(identifier)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({
                 recordings.add(gson.toJson(it))
             }, {
@@ -662,6 +732,7 @@ class PolarPlugin :
 
         wrapper.api
             .getOfflineRecord(identifier, entry)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({
                 runOnUiThread { result.success(gson.toJson(it)) }
             }, {
@@ -672,28 +743,106 @@ class PolarPlugin :
             .discard()
     }
 
-    private fun removeOfflineRecord(call: MethodCall, result: Result) {
-        val arguments = call.arguments as List<*>
-        val identifier = arguments[0] as String
-        val entry = gson.fromJson(arguments[1] as String, PolarOfflineRecordingEntry::class.java)
-
-        wrapper.api
-            .removeOfflineRecord(identifier, entry)
-            .subscribe({
-                runOnUiThread { result.success(null) }
-            }, { error ->
-                runOnUiThread {
-                    val errorCode = when {
-                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
-                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
-                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
-                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
-                        else -> "ERROR_REMOVING_RECORD"
+    /**
+     * Safely removes an offline record, handling NO_SUCH_FILE_OR_DIRECTORY errors gracefully
+     * Use this as an alternative to wrapper.api.removeOfflineRecord which can crash
+     */
+    private fun safeRemoveOfflineRecord(identifier: String, entry: PolarOfflineRecordingEntry): Completable {
+        println("[PolarPlugin] Starting safeRemoveOfflineRecord for identifier: $identifier, path: ${entry.path}")
+        
+        return Completable.create { emitter ->
+            // Set up error handling in case the completable itself has issues
+            RxJavaPlugins.setErrorHandler { e: Throwable ->
+                println("[PolarPlugin] Caught error in safeRemoveOfflineRecord RxJava chain: ${e.message}")
+                // Don't propagate the error - prevents app crashes
+            }
+            
+            try {
+                val subscription = wrapper.api.removeOfflineRecord(identifier, entry)
+                    .doOnError { error ->
+                        println("[PolarPlugin] Error in safeRemoveOfflineRecord: ${error.message}")
                     }
-                    result.error(errorCode, error.message, null)
+                    .subscribe(
+                        { // onComplete 
+                            println("[PolarPlugin] safeRemoveOfflineRecord completed successfully")
+                            if (!emitter.isDisposed) {
+                                emitter.onComplete()
+                            }
+                        },
+                        { error -> // onError
+                            println("[PolarPlugin] Error in safeRemoveOfflineRecord: ${error.message}")
+                            if (error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true) {
+                                // If the file doesn't exist, that's fine - consider it removed
+                                if (!emitter.isDisposed) {
+                                    emitter.onComplete()
+                                }
+                            } else {
+                                // For other errors, propagate them
+                                if (!emitter.isDisposed) {
+                                    emitter.onError(error)
+                                }
+                            }
+                        }
+                    )
+                
+                // Make sure to dispose the subscription when the emitter is cancelled
+                emitter.setCancellable { subscription.dispose() }
+            } catch (e: Exception) {
+                println("[PolarPlugin] Exception in safeRemoveOfflineRecord: ${e.message}")
+                if (!emitter.isDisposed) {
+                    emitter.onError(e)
                 }
-            })
-            .discard()
+            }
+        }
+    }
+
+    // Now update the removeOfflineRecord method to use our safer version
+    private fun removeOfflineRecord(call: MethodCall, result: Result) {
+        try {
+            val arguments = call.arguments as? List<*>
+            val identifier = arguments?.getOrNull(0) as? String
+            val entryJson = arguments?.getOrNull(1) as? String
+
+            if (identifier == null || entryJson == null) {
+                result.error(
+                    PolarErrorCode.INVALID_ARGUMENT,
+                    "Invalid arguments provided",
+                    null
+                )
+                return
+            }
+
+            val entry = gson.fromJson(entryJson, PolarOfflineRecordingEntry::class.java)
+            
+            // Use our safer version instead of calling the API directly
+            safeRemoveOfflineRecord(identifier, entry)
+                .subscribe(
+                    { // onComplete
+                        runOnUiThread { result.success(null) }
+                    },
+                    { error -> // onError
+                        runOnUiThread {
+                            println("[PolarPlugin] Final error in removeOfflineRecord: ${error.message}")
+                            val code = when {
+                                error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                                error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                                error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                                error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                                else -> PolarErrorCode.BLUETOOTH_ERROR
+                            }
+                            result.error(code, error.message, null)
+                        }
+                    }
+                )
+                .discard()
+        } catch (e: Exception) {
+            // Handle any exceptions from parameter extraction or JSON parsing
+            println("[PolarPlugin] Exception in removeOfflineRecord setup: ${e.message}")
+            e.printStackTrace()
+            runOnUiThread { 
+                result.error(PolarErrorCode.INVALID_ARGUMENT, e.message, null)
+            }
+        }
     }
 
     private fun getDiskSpace(call: MethodCall, result: Result) {
@@ -891,6 +1040,7 @@ class PolarPlugin :
         
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
+            .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({ sleepDataList ->
                 runOnUiThread {
                     val jsonArray = sleepDataList.map { sleepData ->
@@ -941,7 +1091,28 @@ class PolarWrapper @OptIn(ExperimentalStdlibApi::class) constructor(
         ),
     private val callbacks: MutableSet<(String, Any?) -> Unit> = mutableSetOf(),
 ) : PolarBleApiCallbackProvider {
+    
+    companion object {
+        private const val TAG = "PolarWrapper"
+    }
+    
     init {
+        // Setup global RxJava error handler to prevent unhandled exceptions
+        RxJavaPlugins.setErrorHandler { e: Throwable ->
+            when {
+                e is OnErrorNotImplementedException && e.cause?.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> {
+                    println("[$TAG] Safely caught NO_SUCH_FILE_OR_DIRECTORY exception from SDK: ${e.cause?.message}")
+                }
+                e is OnErrorNotImplementedException -> {
+                    println("[$TAG] Caught undeliverable RxJava exception from SDK: ${e.cause?.message ?: e.message}")
+                }
+                else -> {
+                    println("[$TAG] Caught RxJava error from SDK: ${e.message}")
+                }
+            }
+            // Don't rethrow - prevent crashes
+        }
+        
         api.setApiCallback(this)
     }
 
