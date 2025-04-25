@@ -1089,6 +1089,31 @@ class Polar {
     }
   }
 
+  /// Stop sleep recording on a Polar device
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address
+  /// - Returns: Future<void> that completes when sleep recording stop action has been successfully sent to device
+  ///   - onError: Possible errors thrown as exceptions
+  Future<void> stopSleepRecording(String identifier) async {
+    try {
+      await _channel.invokeMethod('stopSleepRecording', identifier);
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to stop sleep recording: ${e.message}', e);
+      }
+    } catch (e) {
+      throw PolarDataException('Error stopping sleep recording: $e');
+    }
+  }
+
   // Map<String, dynamic> _convertToStringDynamicMap(Map<Object?, Object?> map) {
   //   return map.map((key, value) {
   //     if (value is Map<Object?, Object?>) {

@@ -1,6 +1,8 @@
 // Add to handleMethodCall
 case "getSleep":
     getSleep(call: call, result: result)
+case "stopSleepRecording":
+    stopSleepRecording(call: call, result: result)
 
 // Add new method
 private func getSleep(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -53,4 +55,43 @@ private func getSleep(call: FlutterMethodCall, result: @escaping FlutterResult) 
                               details: nil))
         }
     }
+}
+
+// Add new function for stopSleepRecording
+private func stopSleepRecording(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let identifier = call.arguments as? String else {
+        result(FlutterError(code: "INVALID_ARGUMENTS", 
+                           message: "Expected a device identifier string", 
+                           details: nil))
+        return
+    }
+    
+    api.stopSleepRecording(identifier: identifier)
+        .subscribe(
+            onCompleted: {
+                result(nil)
+            },
+            onError: { error in
+                let errorCode: String
+                if let polarError = error as? PolarErrors {
+                    switch polarError {
+                    case .deviceDisconnected:
+                        errorCode = "device_disconnected"
+                    case .operationNotSupported:
+                        errorCode = "not_supported"
+                    case .timeout:
+                        errorCode = "timeout"
+                    default:
+                        errorCode = "bluetooth_error"
+                    }
+                } else {
+                    errorCode = "bluetooth_error"
+                }
+                
+                result(FlutterError(code: errorCode,
+                                   message: error.localizedDescription,
+                                   details: nil))
+            }
+        )
+        .disposed(by: disposeBag)
 }

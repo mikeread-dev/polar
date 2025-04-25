@@ -229,6 +229,7 @@ class PolarPlugin :
             "doFirstTimeUse" -> doFirstTimeUse(call, result)
             "isFtuDone" -> isFtuDone(call, result)
             "getSleep" -> getSleep(call, result)
+            "stopSleepRecording" -> stopSleepRecording(call, result)
             else -> result.notImplemented()
         }
     }
@@ -1005,6 +1006,30 @@ class PolarPlugin :
             }, {
                 runOnUiThread {
                     result.error(it.toString(), it.message, null)
+                }
+            })
+            .discard()
+    }
+
+    private fun stopSleepRecording(
+        call: MethodCall,
+        result: Result,
+    ) {
+        val identifier = call.arguments as String
+
+        wrapper.api
+            .stopSleepRecording(identifier)
+            .subscribe({
+                runOnUiThread { result.success(null) }
+            }, { error ->
+                runOnUiThread {
+                    val errorCode = when {
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()
