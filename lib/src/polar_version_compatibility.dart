@@ -1,7 +1,7 @@
 /// Handles compatibility between different SDK versions
 class PolarVersionCompatibility {
   /// Current version of the Polar SDK
-  static const currentSdkVersion = '5.17.0';
+  static const currentSdkVersion = '6.2.0';
   
   /// Checks if the current SDK version supports the new streaming API
   /// 
