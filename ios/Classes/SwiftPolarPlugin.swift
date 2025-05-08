@@ -47,6 +47,9 @@ public class SwiftPolarPlugin:
   var streamingChannels = [String: StreamingChannel]()
 
   var api: PolarBleApi!
+  
+  /// Disposable bag for RxSwift subscriptions
+  let disposeBag = DisposeBag()
 
   init(
     messenger: FlutterBinaryMessenger,
@@ -149,6 +152,10 @@ public class SwiftPolarPlugin:
         doFirstTimeUse(call, result)
       case "isFtuDone":
         isFtuDone(call, result)
+      case "getSleep":
+        getSleep(call, result)
+      case "stopSleepRecording":
+        stopSleepRecording(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -369,9 +376,11 @@ public class SwiftPolarPlugin:
                 },
                 onError: { error in
                     let code: String
-                    if error is PolarBleSdkError.DeviceDisconnected {
+                    // Use a more generic approach rather than specific error types
+                    let errorDescription = error.localizedDescription.lowercased()
+                    if errorDescription.contains("disconnect") {
                         code = PolarErrorCode.deviceDisconnected
-                    } else if error is PolarBleSdkError.OperationNotSupported {
+                    } else if errorDescription.contains("support") || errorDescription.contains("unsupport") {
                         code = PolarErrorCode.notSupported
                     } else {
                         code = PolarErrorCode.bluetoothError
@@ -501,6 +510,24 @@ public class SwiftPolarPlugin:
     invokeMethod("batteryLevelReceived", arguments: [identifier, batteryLevel])
   }
 
+  public func batteryChargingStatusReceived(_ identifier: String, chargingStatus: BleBasClient.ChargeState) {
+    // Convert ChargeState to integer values that Flutter can understand
+    let statusValue: Int
+    
+    switch chargingStatus {
+    case .unknown:
+      statusValue = -1
+    case .charging:
+      statusValue = 1
+    case .dischargingActive:
+      statusValue = 0
+    case .dischargingInactive:
+      statusValue = 2
+    }
+    
+    invokeMethod("batteryChargingStatusReceived", arguments: [identifier, statusValue])
+  }
+
   public func blePowerOn() {
     invokeMethod("blePowerStateChanged", arguments: true)
   }
@@ -527,6 +554,10 @@ public class SwiftPolarPlugin:
     _ identifier: String, key: String, value: String
   ) {
     channel.invokeMethod("disInformationReceived", arguments: [identifier, key, value])
+  }
+
+  public func deviceInfoReceived(_ identifier: String, rssi: Int, name: String, connectable: Bool) {
+    invokeMethod("deviceInfoReceived", arguments: [identifier, rssi, name, connectable])
   }
 
   // MARK: Deprecated functions
@@ -1002,6 +1033,18 @@ public class SwiftPolarPlugin:
         )
       }
     )
+  }
+
+  func getSleep(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    // This method is not available in the current Polar SDK version
+    // You need to implement a custom sleep tracking solution or update to a version of the SDK that supports it
+    result(FlutterMethodNotImplemented)
+  }
+
+  func stopSleepRecording(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    // This method is not available in the current Polar SDK version
+    // You need to implement a custom sleep tracking solution or update to a version of the SDK that supports it
+    result(FlutterMethodNotImplemented)
   }
 }
 
