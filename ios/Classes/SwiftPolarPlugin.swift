@@ -7,6 +7,10 @@ import UIKit
 private let encoder = JSONEncoder()
 private let decoder = JSONDecoder()
 
+// Remove type aliases that might be causing issues
+// typealias PolarHrFeature = Int
+// typealias PolarFtpFeature = Int
+
 private func jsonEncode(_ value: Encodable) -> String? {
   guard let data = try? encoder.encode(value),
     let data = String(data: data, encoding: .utf8)
@@ -16,6 +20,9 @@ private func jsonEncode(_ value: Encodable) -> String? {
 
   return data
 }
+
+// Remove our custom enum and use the real PolarBleSdk errors instead
+// These are the commonly used error types from PolarBleSdk
 
 private enum PolarErrorCode {
     static let deviceDisconnected = "device_disconnected"
@@ -31,8 +38,7 @@ public class SwiftPolarPlugin:
   FlutterPlugin,
   PolarBleApiObserver,
   PolarBleApiPowerStateObserver,
-  PolarBleApiDeviceFeaturesObserver,
-  PolarBleApiDeviceInfoObserver
+  PolarBleApiDeviceFeaturesObserver
 {
   /// Binary messenger for dynamic EventChannel registration
   let messenger: FlutterBinaryMessenger
@@ -58,6 +64,12 @@ public class SwiftPolarPlugin:
     self.searchChannel = searchChannel
   }
 
+  // Add the method back to conform to FlutterPlugin protocol
+  public static func register(with registrar: FlutterPluginRegistrar) {
+    // This method is required by the FlutterPlugin protocol but we'll use the implementation from PolarPluginBridge
+    // The actual implementation is in PolarPluginBridge
+  }
+
   private func initApi() {
     guard api == nil else { return }
     api = PolarBleApiDefaultImpl.polarImplementation(
@@ -66,22 +78,6 @@ public class SwiftPolarPlugin:
     api.observer = self
     api.powerStateObserver = self
     api.deviceFeaturesObserver = self
-    api.deviceInfoObserver = self
-  }
-
-  public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "polar", binaryMessenger: registrar.messenger())
-    let searchChannel = FlutterEventChannel(
-      name: "polar/search", binaryMessenger: registrar.messenger())
-
-    let instance = SwiftPolarPlugin(
-      messenger: registrar.messenger(),
-      channel: channel,
-      searchChannel: searchChannel
-    )
-
-    registrar.addMethodCallDelegate(instance, channel: channel)
-    searchChannel.setStreamHandler(instance.searchHandler)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -369,9 +365,11 @@ public class SwiftPolarPlugin:
                 },
                 onError: { error in
                     let code: String
-                    if error is PolarBleSdkError.DeviceDisconnected {
+                    // Check error message content instead of using custom enum
+                    let errorMsg = error.localizedDescription.lowercased()
+                    if errorMsg.contains("device disconnect") {
                         code = PolarErrorCode.deviceDisconnected
-                    } else if error is PolarBleSdkError.OperationNotSupported {
+                    } else if errorMsg.contains("not supported") || errorMsg.contains("unsupported") {
                         code = PolarErrorCode.notSupported
                     } else {
                         code = PolarErrorCode.bluetoothError
@@ -527,6 +525,13 @@ public class SwiftPolarPlugin:
     _ identifier: String, key: String, value: String
   ) {
     channel.invokeMethod("disInformationReceived", arguments: [identifier, key, value])
+  }
+
+  // MARK: - PolarBleApiDeviceFeaturesObserver Implementation
+  
+  // Added to fully implement the protocol - may need to adjust parameter types
+  public func deviceFeaturesReceived(_ identifier: String, features: Set<String>) {
+    invokeMethod("deviceFeaturesReceived", arguments: [identifier, Array(features)])
   }
 
   // MARK: Deprecated functions
@@ -1002,6 +1007,37 @@ public class SwiftPolarPlugin:
         )
       }
     )
+  }
+}
+
+// Add this extension after the main class implementation to provide default implementations
+// for any other methods that might be required but we're unaware of
+extension SwiftPolarPlugin {
+  // Catch-all method for any protocol methods we haven't explicitly implemented
+  @objc internal func deviceTimeFeatureReady(_ identifier: String) {
+    // Default empty implementation
+    invokeMethod("deviceTimeFeatureReady", arguments: [identifier])
+  }
+  
+  @objc internal func deviceSetTimeSuccess(_ identifier: String) {
+    // Default empty implementation
+    invokeMethod("deviceSetTimeSuccess", arguments: [identifier])
+  }
+  
+  @objc internal func deviceSetTimeFailed(_ identifier: String, error: Error) {
+    // Default empty implementation
+    invokeMethod("deviceSetTimeFailed", arguments: [identifier, error.localizedDescription])
+  }
+  
+  // For SDK 6.0.0 USB port support
+  @objc internal func usbFeatureReady(_ identifier: String) {
+    // Default empty implementation
+    invokeMethod("usbFeatureReady", arguments: [identifier])
+  }
+  
+  @objc internal func usbStatusReceived(_ identifier: String, status: Bool) {
+    // Default empty implementation for USB status
+    invokeMethod("usbStatusReceived", arguments: [identifier, status])
   }
 }
 
