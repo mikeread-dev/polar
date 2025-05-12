@@ -283,33 +283,24 @@ typealias PolarPpiSample = (
   skinContactSupported: Int
 )
 
-class PolarPpiSampleCodable: Encodable {
-  let data: PolarPpiSample
-
-  init(_ data: PolarPpiSample) {
-    self.data = data
-  }
-
-  enum CodingKeys: String, CodingKey {
-    case timeStamp
-    case hr
-    case ppInMs
-    case ppErrorEstimate
-    case blockerBit
-    case skinContactStatus
-    case skinContactSupported
-  }
-
-  func encode(to encoder: Encoder) {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try? container.encode(data.timeStamp, forKey: .timeStamp)
-    try? container.encode(data.hr, forKey: .hr)
-    try? container.encode(data.ppInMs, forKey: .ppInMs)
-    try? container.encode(data.ppErrorEstimate, forKey: .ppErrorEstimate)
-    try? container.encode(data.blockerBit, forKey: .blockerBit)
-    try? container.encode(data.skinContactStatus, forKey: .skinContactStatus)
-    try? container.encode(data.skinContactSupported, forKey: .skinContactSupported)
-  }
+struct PolarPpiSampleCodable: Codable {
+    let timeStamp: UInt64
+    let hr: Int
+    let ppInMs: UInt16
+    let ppErrorEstimate: UInt16
+    let blockerBit: Int
+    let skinContactStatus: Int
+    let skinContactSupported: Int
+    
+    init(_ sample: PolarPpiSample) {
+        timeStamp = sample.timeStamp
+        hr = sample.hr
+        ppInMs = sample.ppInMs
+        ppErrorEstimate = sample.ppErrorEstimate
+        blockerBit = sample.blockerBit
+        skinContactStatus = sample.skinContactStatus
+        skinContactSupported = sample.skinContactSupported
+    }
 }
 
 typealias PolarTemperatureSample = (timeStamp: UInt64, temperature: Float)
