@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:polar/polar.dart';
@@ -1047,8 +1048,20 @@ class Polar {
         throw PolarDataException('fromDate cannot be in the future');
       }
 
-      final fromDateStr = fromDate.toIso8601String().split('T')[0];
-      final toDateStr = toDate.toIso8601String().split('T')[0];
+      // The key fix: Apply timezone offset to ensure consistent date interpretation
+      // Convert to UTC to avoid timezone issues before extracting the date
+      final fromDateUtc = fromDate.toUtc();
+      final toDateUtc = toDate.toUtc();
+      
+      // Log for debugging
+      debugPrint('Polar getSleep: original from=$fromDate, to=$toDate');
+      debugPrint('Polar getSleep: UTC from=$fromDateUtc, to=$toDateUtc');
+      
+      // Extract just the date part in YYYY-MM-DD format
+      final fromDateStr = fromDateUtc.toIso8601String().split('T')[0];
+      final toDateStr = toDateUtc.toIso8601String().split('T')[0];
+      
+      debugPrint('Polar getSleep: sending fromDateStr=$fromDateStr, toDateStr=$toDateStr');
 
       final response = await _channel.invokeMethod(
         'getSleep',
@@ -1111,6 +1124,79 @@ class Polar {
       }
     } catch (e) {
       throw PolarDataException('Error stopping sleep recording: $e');
+    }
+  }
+
+  /// Get sleep recording state for a Polar device
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address
+  /// - Returns: Future<bool> indicating if sleep recording is ongoing
+  ///   - onError: Possible errors thrown as exceptions
+  Future<bool> getSleepRecordingState(String identifier) async {
+    try {
+      debugPrint('Polar getSleepRecordingState: checking state for $identifier');
+      final result = await _channel.invokeMethod<bool>('getSleepRecordingState', identifier);
+      debugPrint('Polar getSleepRecordingState: result is $result');
+      // If the result is null, default to false for safety
+      return result ?? false;
+    } on PlatformException catch (e) {
+      debugPrint('Polar getSleepRecordingState: error - ${e.code}: ${e.message}');
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarNotSupportedException('Sleep state checking not supported on device $identifier', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to get sleep recording state: ${e.message}', e);
+      }
+    } catch (e) {
+      debugPrint('Polar getSleepRecordingState: unexpected error - $e');
+      throw PolarDataException('Error checking sleep recording state: $e');
+    }
+  }
+
+  /// Observe sleep recording state for a Polar device
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address
+  /// - Returns: Stream<bool> of values indicating if sleep recording is ongoing
+  ///   - onError: Possible errors thrown as exceptions
+  Stream<bool> observeSleepRecordingState(String identifier) {
+    debugPrint('Polar observeSleepRecordingState: starting observation for $identifier');
+    final channelName = 'polar/sleep_state/$identifier';
+    
+    // Create a method to setup the event channel
+    return _setupObservationChannel(channelName, identifier);
+  }
+  
+  // Helper method to set up an observation channel
+  Stream<bool> _setupObservationChannel(String channelName, String identifier) async* {
+    try {
+      // First check if the feature is available
+      await _channel.invokeMethod('setupSleepStateObservation', [channelName, identifier]);
+      
+      yield* EventChannel(channelName)
+          .receiveBroadcastStream()
+          .map((dynamic event) => event as bool)
+          .handleError((error) {
+            debugPrint('Polar sleep state observation error: $error');
+            // Transform platform errors to our custom exceptions
+            if (error is PlatformException) {
+              switch (error.code) {
+                case 'device_disconnected':
+                  throw PolarDeviceDisconnectedException('Device $identifier disconnected', error);
+                case 'not_supported':
+                  throw PolarNotSupportedException('Sleep state observation not supported', error);
+                default:
+                  throw PolarBluetoothOperationException('Sleep state observation error: ${error.message}', error);
+              }
+            }
+            throw PolarDataException('Sleep state observation error: $error');
+          });
+    } catch (e) {
+      debugPrint('Polar _setupObservationChannel error: $e');
+      throw PolarDataException('Failed to setup sleep state observation: $e');
     }
   }
 

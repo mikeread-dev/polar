@@ -156,6 +156,10 @@ public class SwiftPolarPlugin:
         getSleep(call, result)
       case "stopSleepRecording":
         stopSleepRecording(call, result)
+      case "getSleepRecordingState":
+        getSleepRecordingState(call, result)
+      case "setupSleepStateObservation":
+        setupSleepStateObservation(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -1036,15 +1040,250 @@ public class SwiftPolarPlugin:
   }
 
   func getSleep(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
-    // This method is not available in the current Polar SDK version
-    // You need to implement a custom sleep tracking solution or update to a version of the SDK that supports it
-    result(FlutterMethodNotImplemented)
+    let arguments = call.arguments as! [Any]
+    let identifier = arguments[0] as! String
+    let fromDateStr = arguments[1] as! String
+    let toDateStr = arguments[2] as! String
+    
+    // Convert strings to Date objects
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd"
+    
+    guard let fromDate = dateFormatter.date(from: fromDateStr),
+          let toDate = dateFormatter.date(from: toDateStr) else {
+        result(FlutterError(
+          code: PolarErrorCode.invalidArgument,
+          message: "Invalid date format",
+          details: nil))
+        return
+    }
+    
+    // For debugging
+    print("[PolarPlugin] getSleep called with fromDate=\(fromDateStr), toDate=\(toDateStr)")
+    
+    // Convert to LocalDate objects for the Polar SDK
+    let calendar = Calendar.current
+    let fromLocalDate = try? DateComponents(
+        calendar: calendar,
+        year: calendar.component(.year, from: fromDate),
+        month: calendar.component(.month, from: fromDate),
+        day: calendar.component(.day, from: fromDate)
+    ).toLocalDate()
+    
+    let toLocalDate = try? DateComponents(
+        calendar: calendar,
+        year: calendar.component(.year, from: toDate),
+        month: calendar.component(.month, from: toDate),
+        day: calendar.component(.day, from: toDate)
+    ).toLocalDate()
+    
+    guard let fromLocalDate = fromLocalDate, let toLocalDate = toLocalDate else {
+        result(FlutterError(
+          code: PolarErrorCode.invalidArgument,
+          message: "Failed to convert dates to local date format",
+          details: nil))
+        return
+    }
+    
+    _ = api.getSleep(identifier, fromDate: fromLocalDate, toDate: toLocalDate).subscribe(
+        onSuccess: { sleepDataList in
+            print("[PolarPlugin] getSleep received \(sleepDataList.count) sleep records")
+            
+            // For debugging
+            for sleepData in sleepDataList {
+                print("[PolarPlugin] Sleep data date: \(String(describing: sleepData.date)), result date: \(String(describing: sleepData.result?.sleepResultDate))")
+            }
+            
+            // Convert to JSON and return
+            guard let jsonData = try? JSONEncoder().encode(sleepDataList) else {
+                result(FlutterError(
+                  code: "ENCODING_ERROR",
+                  message: "Failed to encode sleep data to JSON",
+                  details: nil))
+                return
+            }
+            
+            let jsonString = String(data: jsonData, encoding: .utf8)
+            result(jsonString)
+        },
+        onFailure: { error in
+            print("[PolarPlugin] getSleep error: \(error.localizedDescription)")
+            let errorCode = self.mapErrorCode(error)
+            result(FlutterError(
+              code: errorCode,
+              message: error.localizedDescription,
+              details: nil))
+        }
+    )
   }
 
   func stopSleepRecording(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
-    // This method is not available in the current Polar SDK version
-    // You need to implement a custom sleep tracking solution or update to a version of the SDK that supports it
-    result(FlutterMethodNotImplemented)
+    guard let identifier = call.arguments as? String else {
+        result(FlutterError(
+          code: PolarErrorCode.invalidArgument,
+          message: "Expected a device identifier as a String",
+          details: nil))
+        return
+    }
+    
+    print("[PolarPlugin] stopSleepRecording called for device \(identifier) at \(Date())")
+    
+    // Get device time for debugging
+    _ = api.getLocalTime(identifier).subscribe(
+        onSuccess: { deviceTime in
+            print("[PolarPlugin] Device time before stopping sleep recording: \(deviceTime)")
+            
+            // Now stop the sleep recording
+            _ = self.api.stopSleepRecording(identifier).subscribe(
+                onCompleted: {
+                    print("[PolarPlugin] Successfully stopped sleep recording")
+                    result(nil)
+                },
+                onError: { error in
+                    print("[PolarPlugin] Error stopping sleep recording: \(error.localizedDescription)")
+                    print("[PolarPlugin] Error type: \(type(of: error))")
+                    
+                    let errorCode = self.mapErrorCode(error)
+                    result(FlutterError(
+                      code: errorCode,
+                      message: error.localizedDescription,
+                      details: nil))
+                }
+            )
+        },
+        onFailure: { error in
+            print("[PolarPlugin] Could not get device time: \(error.localizedDescription)")
+            
+            // Continue with stopping sleep recording even if we can't get the time
+            _ = self.api.stopSleepRecording(identifier).subscribe(
+                onCompleted: {
+                    result(nil)
+                },
+                onError: { error in
+                    print("[PolarPlugin] Error stopping sleep recording: \(error.localizedDescription)")
+                    
+                    let errorCode = self.mapErrorCode(error)
+                    result(FlutterError(
+                      code: errorCode,
+                      message: error.localizedDescription,
+                      details: nil))
+                }
+            )
+        }
+    )
+  }
+  
+  func getSleepRecordingState(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let identifier = call.arguments as? String else {
+        result(FlutterError(
+          code: PolarErrorCode.invalidArgument,
+          message: "Expected a device identifier as a String",
+          details: nil))
+        return
+    }
+    
+    print("[PolarPlugin] getSleepRecordingState called for device \(identifier)")
+    
+    _ = api.getSleepRecordingState(identifier).subscribe(
+        onSuccess: { isRecording in
+            print("[PolarPlugin] getSleepRecordingState result: \(isRecording)")
+            result(isRecording)
+        },
+        onFailure: { error in
+            print("[PolarPlugin] Error getting sleep recording state: \(error.localizedDescription)")
+            
+            let errorCode = self.mapErrorCode(error)
+            result(FlutterError(
+              code: errorCode,
+              message: error.localizedDescription,
+              details: nil))
+        }
+    )
+  }
+  
+  func setupSleepStateObservation(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    let arguments = call.arguments as! [String]
+    let eventChannelName = arguments[0]
+    let identifier = arguments[1]
+    
+    print("[PolarPlugin] Setting up sleep state observation for \(identifier) on channel \(eventChannelName)")
+    
+    // Create an event channel for this observation
+    let eventChannel = FlutterEventChannel(name: eventChannelName, binaryMessenger: messenger)
+    
+    // Set up the handler for the event channel
+    let streamHandler = StreamHandler(
+        onListen: { _, events in
+            print("[PolarPlugin] Starting sleep state observation for \(identifier)")
+            
+            let stateSubscription = self.api.observeSleepRecordingState(identifier).subscribe(
+                onNext: { state in
+                    print("[PolarPlugin] Sleep state changed: \(state[0])")
+                    DispatchQueue.main.async {
+                        events(state[0])  // First element is the sleep state
+                    }
+                },
+                onError: { error in
+                    print("[PolarPlugin] Error in sleep state observation: \(error.localizedDescription)")
+                    
+                    let errorCode = self.mapErrorCode(error)
+                    DispatchQueue.main.async {
+                        events(FlutterError(
+                          code: errorCode,
+                          message: error.localizedDescription,
+                          details: nil))
+                    }
+                },
+                onCompleted: {
+                    print("[PolarPlugin] Sleep state observation completed")
+                    DispatchQueue.main.async {
+                        events(FlutterEndOfEventStream)
+                    }
+                }
+            )
+            
+            return stateSubscription
+        },
+        onCancel: { subscription in
+            print("[PolarPlugin] Cancelling sleep state observation for \(identifier)")
+            (subscription as? Disposable)?.dispose()
+            return nil
+        }
+    )
+    
+    eventChannel.setStreamHandler(streamHandler)
+    
+    // Indicate successful setup
+    result(nil)
+  }
+  
+  // Helper method to map Polar SDK errors to our error codes
+  private func mapErrorCode(_ error: Error) -> String {
+    if let polarError = error as? PolarErrors {
+        switch polarError {
+        case .deviceDisconnected:
+            return PolarErrorCode.deviceDisconnected
+        case .operationNotSupported:
+            return PolarErrorCode.notSupported
+        case .bluetoothNotEnabled, .bluetoothNotAvailable:
+            return PolarErrorCode.bluetoothError
+        case .deviceNotConnected, .deviceNotFound:
+            return PolarErrorCode.deviceDisconnected
+        case .operationOngoing, .serviceNotFound:
+            return PolarErrorCode.operationNotAllowed
+        default:
+            if error.localizedDescription.contains("106") {
+                return PolarErrorCode.bluetoothError
+            }
+            return PolarErrorCode.bluetoothError
+        }
+    }
+    
+    if error.localizedDescription.contains("timeout") {
+        return PolarErrorCode.timeout
+    }
+    
+    return "error"
   }
 }
 

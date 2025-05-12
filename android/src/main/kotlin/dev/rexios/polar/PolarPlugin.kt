@@ -230,6 +230,8 @@ class PolarPlugin :
             "isFtuDone" -> isFtuDone(call, result)
             "getSleep" -> getSleep(call, result)
             "stopSleepRecording" -> stopSleepRecording(call, result)
+            "getSleepRecordingState" -> getSleepRecordingState(call, result)
+            "setupSleepStateObservation" -> setupSleepStateObservation(call, result)
             else -> result.notImplemented()
         }
     }
@@ -1063,10 +1065,20 @@ class PolarPlugin :
         val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
         val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
         
+        // For debugging timezone issues
+        println("[PolarPlugin] getSleep called with fromDate=$fromDate, toDate=$toDate")
+        
         wrapper.api
             .getSleep(identifier, fromDate, toDate)
             .doOnError { error -> System.err.println("The error message is: " + error.message) }
             .subscribe({ sleepDataList ->
+                println("[PolarPlugin] getSleep received ${sleepDataList.size} sleep records")
+                
+                // Debug the data we're getting back to help identify timezone issues
+                sleepDataList.forEach { sleepData ->
+                    println("[PolarPlugin] Sleep data date: ${sleepData.date}, result date: ${sleepData.result?.sleepResultDate}")
+                }
+                
                 runOnUiThread {
                     val jsonArray = sleepDataList.map { sleepData ->
                         mapOf(
@@ -1099,11 +1111,90 @@ class PolarPlugin :
                     result.success(gson.toJson(jsonArray))
                 }
             }, {
+                println("[PolarPlugin] getSleep error: ${it.message}")
                 runOnUiThread {
                     result.error(it.toString(), it.message, null)
                 }
             })
             .discard()
+    }
+
+    private fun getSleepRecordingState(call: MethodCall, result: Result) {
+        val identifier = call.arguments as String
+        println("[PolarPlugin] getSleepRecordingState called for device $identifier")
+        
+        wrapper.api
+            .getSleepRecordingState(identifier)
+            .subscribe({ isRecording ->
+                println("[PolarPlugin] getSleepRecordingState result: $isRecording")
+                runOnUiThread { result.success(isRecording) }
+            }, { error ->
+                println("[PolarPlugin] Error getting sleep recording state: ${error.message}")
+                runOnUiThread {
+                    val errorCode = when {
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, error.message, null)
+                }
+            })
+            .discard()
+    }
+    
+    private fun setupSleepStateObservation(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val eventChannelName = arguments[0] as String
+        val identifier = arguments[1] as String
+        
+        println("[PolarPlugin] Setting up sleep state observation for $identifier on channel $eventChannelName")
+        
+        // Create an event channel for this observation
+        val eventChannel = EventChannel(messenger, eventChannelName)
+        
+        // Set up the handler for the event channel
+        eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            private var stateSubscription: Disposable? = null
+            
+            override fun onListen(arguments: Any?, events: EventSink?) {
+                if (events == null) {
+                    println("[PolarPlugin] Events sink is null for sleep state observation")
+                    return
+                }
+                
+                println("[PolarPlugin] Starting sleep state observation for $identifier")
+                
+                stateSubscription = wrapper.api
+                    .observeSleepRecordingState(identifier)
+                    .subscribe({ state ->
+                        println("[PolarPlugin] Sleep state changed: $state")
+                        runOnUiThread { events.success(state[0]) } // First element is the sleep state
+                    }, { error ->
+                        println("[PolarPlugin] Error in sleep state observation: ${error.message}")
+                        runOnUiThread {
+                            val errorCode = when {
+                                error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                                error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                                else -> PolarErrorCode.BLUETOOTH_ERROR
+                            }
+                            events.error(errorCode, error.message, null)
+                        }
+                    }, {
+                        println("[PolarPlugin] Sleep state observation completed")
+                        runOnUiThread { events.endOfStream() }
+                    })
+            }
+            
+            override fun onCancel(arguments: Any?) {
+                println("[PolarPlugin] Cancelling sleep state observation for $identifier")
+                stateSubscription?.dispose()
+                stateSubscription = null
+            }
+        })
+        
+        // Indicate successful setup
+        result.success(null)
     }
 }
 
