@@ -1048,19 +1048,13 @@ class Polar {
         throw PolarDataException('fromDate cannot be in the future');
       }
 
-      // The key fix: Apply timezone offset to ensure consistent date interpretation
-      // Convert to UTC to avoid timezone issues before extracting the date
-      final fromDateUtc = fromDate.toUtc();
-      final toDateUtc = toDate.toUtc();
+      // FIXED: Don't convert to UTC, preserve local date
+      // Extract just the date part in YYYY-MM-DD format using local time
+      final fromDateStr = '${fromDate.year}-${fromDate.month.toString().padLeft(2, '0')}-${fromDate.day.toString().padLeft(2, '0')}';
+      final toDateStr = '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}';
       
       // Log for debugging
-      debugPrint('Polar getSleep: original from=$fromDate, to=$toDate');
-      debugPrint('Polar getSleep: UTC from=$fromDateUtc, to=$toDateUtc');
-      
-      // Extract just the date part in YYYY-MM-DD format
-      final fromDateStr = fromDateUtc.toIso8601String().split('T')[0];
-      final toDateStr = toDateUtc.toIso8601String().split('T')[0];
-      
+      debugPrint('Polar getSleep: local dates from=$fromDate, to=$toDate');
       debugPrint('Polar getSleep: sending fromDateStr=$fromDateStr, toDateStr=$toDateStr');
 
       final response = await _channel.invokeMethod(
