@@ -1,5 +1,4 @@
 import 'package:json_annotation/json_annotation.dart';
-import 'package:polar/src/model/convert.dart';
 
 part 'polar_247_ppi_samples_data.g.dart';
 
