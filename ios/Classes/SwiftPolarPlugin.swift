@@ -156,6 +156,8 @@ public class SwiftPolarPlugin:
         getSleepRecordingState(call, result)
       case "setupSleepStateObservation":
         setupSleepStateObservation(call, result)
+      case "get247PPiSamples":
+        get247PPiSamples(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -1287,6 +1289,143 @@ public class SwiftPolarPlugin:
     }
     
     return "error"
+  }
+
+  func get247PPiSamples(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let api = api else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "API not initialized",
+        details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [Any],
+          let identifier = args[0] as? String,
+          let fromDateMillis = args[1] as? Int64,
+          let toDateMillis = args[2] as? Int64 else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid arguments",
+        details: nil))
+      return
+    }
+    
+    let fromDate = Date(timeIntervalSince1970: Double(fromDateMillis) / 1000)
+    let toDate = Date(timeIntervalSince1970: Double(toDateMillis) / 1000)
+    
+    print("[PolarPlugin] get247PPiSamples called with fromDate=\(fromDate), toDate=\(toDate)")
+    
+    _ = api.get247PPiSamples(identifier, fromDate: fromDate, toDate: toDate).subscribe(
+      onSuccess: { ppiSamplesList in
+        print("[PolarPlugin] get247PPiSamples received \(ppiSamplesList.count) samples")
+        
+        // Debug the data we're getting back
+        for ppiSample in ppiSamplesList {
+          print("[PolarPlugin] PPi sample date: \(ppiSample.date)")
+        }
+        
+        let jsonArray = ppiSamplesList.map { ppiSample -> [String: Any] in
+          let statusList = ppiSample.samples.statusList.map { status -> [String: String] in
+            return [
+              "skinContact": self.skinContactToString(status.skinContact),
+              "movement": self.movementToString(status.movement),
+              "intervalStatus": self.intervalStatusToString(status.intervalStatus)
+            ]
+          }
+          
+          return [
+            "date": ppiSample.date.timeIntervalSince1970 * 1000, // Convert to milliseconds
+            "samples": [
+              "startTime": ppiSample.samples.startTime.description,
+              "triggerType": self.triggerTypeToString(ppiSample.samples.triggerType),
+              "ppiValueList": ppiSample.samples.ppiValueList,
+              "ppiErrorEstimateList": ppiSample.samples.ppiErrorEstimateList,
+              "statusList": statusList
+            ]
+          ]
+        }
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: jsonArray),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+          self.handleResult(result, jsonString)
+        } else {
+          result(FlutterError(
+            code: PolarErrorCode.invalidArgument,
+            message: "Failed to serialize data",
+            details: nil))
+        }
+      },
+      onError: { error in
+        print("[PolarPlugin] get247PPiSamples error: \(error.localizedDescription)")
+        
+        let errorCode: String
+        if let polarError = error as? PolarBleApiError {
+          switch polarError {
+          case .deviceDisconnected:
+            errorCode = PolarErrorCode.deviceDisconnected
+          case .operationNotSupported:
+            errorCode = PolarErrorCode.notSupported
+          default:
+            errorCode = PolarErrorCode.bluetoothError
+          }
+        } else if error.localizedDescription.lowercased().contains("timeout") {
+          errorCode = PolarErrorCode.timeout
+        } else {
+          errorCode = PolarErrorCode.bluetoothError
+        }
+        
+        result(FlutterError(
+          code: errorCode,
+          message: error.localizedDescription,
+          details: nil))
+      }
+    )
+  }
+
+  // Helper methods to convert enums to strings
+  func skinContactToString(_ skinContact: PPiSampleStatus.SkinContact) -> String {
+    switch skinContact {
+    case .undefined:
+      return "SKIN_CONTACT_UNDEFINED"
+    case .ok:
+      return "SKIN_CONTACT_OK"
+    case .notOk:
+      return "SKIN_CONTACT_NOT_OK"
+    }
+  }
+
+  func movementToString(_ movement: PPiSampleStatus.Movement) -> String {
+    switch movement {
+    case .undefined:
+      return "MOVEMENT_UNDEFINED"
+    case .ok:
+      return "MOVEMENT_OK"
+    case .notOk:
+      return "MOVEMENT_NOT_OK"
+    }
+  }
+
+  func intervalStatusToString(_ intervalStatus: PPiSampleStatus.IntervalStatus) -> String {
+    switch intervalStatus {
+    case .undefined:
+      return "INTERVAL_STATUS_UNDEFINED"
+    case .valid:
+      return "INTERVAL_STATUS_VALID"
+    case .invalid:
+      return "INTERVAL_STATUS_INVALID"
+    }
+  }
+
+  func triggerTypeToString(_ triggerType: PPiSampleTriggerType) -> String {
+    switch triggerType {
+    case .undefined:
+      return "TRIGGER_TYPE_UNDEFINED"
+    case .automatic:
+      return "TRIGGER_TYPE_AUTOMATIC"
+    case .manual:
+      return "TRIGGER_TYPE_MANUAL"
+    }
   }
 }
 

@@ -52,6 +52,8 @@ import java.util.UUID
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
+import java.util.TimeZone
 import com.polar.sdk.api.errors.PolarDeviceDisconnected
 import com.polar.sdk.api.errors.PolarOperationNotSupported
 import io.reactivex.rxjava3.plugins.RxJavaPlugins
@@ -232,6 +234,7 @@ class PolarPlugin :
             "stopSleepRecording" -> stopSleepRecording(call, result)
             "getSleepRecordingState" -> getSleepRecordingState(call, result)
             "setupSleepStateObservation" -> setupSleepStateObservation(call, result)
+            "get247PPiSamples" -> get247PPiSamples(call, result)
             else -> result.notImplemented()
         }
     }
@@ -1195,6 +1198,68 @@ class PolarPlugin :
         
         // Indicate successful setup
         result.success(null)
+    }
+
+    private fun get247PPiSamples(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        calendar.timeInMillis = arguments[1] as Long
+        val fromDate = calendar.time
+
+        calendar.timeInMillis = arguments[2] as Long
+        val toDate = calendar.time
+        
+        // Format dates in UTC for logging
+        val utcFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss 'UTC'", Locale.US)
+        utcFormat.timeZone = TimeZone.getTimeZone("UTC")
+        
+        println("[PolarPlugin] get247PPiSamples called with fromDate=${utcFormat.format(fromDate)}, toDate=${utcFormat.format(toDate)}")
+        
+        wrapper.api
+            .get247PPiSamples(identifier, fromDate, toDate)
+            .subscribe({ ppiSamplesList ->
+                println("[PolarPlugin] get247PPiSamples received ${ppiSamplesList.size} samples")
+                
+                // Debug the data we're getting back
+                ppiSamplesList.forEach { ppiSample ->
+                    println("[PolarPlugin] PPi sample date: ${ppiSample.date}")
+                }
+                
+                runOnUiThread {
+                    val jsonArray = ppiSamplesList.map { ppiSample ->
+                        mapOf(
+                            "date" to ppiSample.date.time,
+                            "samples" to mapOf(
+                                "startTime" to ppiSample.samples.startTime.toString(),
+                                "triggerType" to ppiSample.samples.triggerType.name,
+                                "ppiValueList" to ppiSample.samples.ppiValueList,
+                                "ppiErrorEstimateList" to ppiSample.samples.ppiErrorEstimateList,
+                                "statusList" to ppiSample.samples.statusList.map { status ->
+                                    mapOf(
+                                        "skinContact" to status.skinContact.name,
+                                        "movement" to status.movement.name,
+                                        "intervalStatus" to status.intervalStatus.name
+                                    )
+                                }
+                            )
+                        )
+                    }
+                    result.success(gson.toJson(jsonArray))
+                }
+            }, {
+                println("[PolarPlugin] get247PPiSamples error: ${it.message}")
+                runOnUiThread {
+                    val errorCode = when {
+                        it is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        it is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        it.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, it.message, null)
+                }
+            })
+            .discard()
     }
 }
 
