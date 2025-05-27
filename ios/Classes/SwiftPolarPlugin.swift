@@ -158,6 +158,8 @@ public class SwiftPolarPlugin:
         setupSleepStateObservation(call, result)
       case "get247PPiSamples":
         get247PPiSamples(call, result)
+      case "deleteDeviceDateFolders":
+        deleteDeviceDateFolders(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -1426,6 +1428,76 @@ public class SwiftPolarPlugin:
     case .manual:
       return "TRIGGER_TYPE_MANUAL"
     }
+  }
+
+  func deleteDeviceDateFolders(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let api = api else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "API not initialized",
+        details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [Any],
+          let identifier = args[0] as? String,
+          let fromDateStr = args[1] as? String,
+          let toDateStr = args[2] as? String else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid arguments",
+        details: nil))
+      return
+    }
+    
+    // Parse the date strings (YYYY-MM-DD format)
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd"
+    dateFormatter.timeZone = TimeZone.current
+    
+    guard let fromDate = dateFormatter.date(from: fromDateStr),
+          let toDate = dateFormatter.date(from: toDateStr) else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid date format. Expected YYYY-MM-DD",
+        details: nil))
+      return
+    }
+    
+    print("[PolarPlugin] deleteDeviceDateFolders called with fromDate=\(fromDate), toDate=\(toDate)")
+    
+    _ = api.deleteDeviceDateFolders(identifier, fromDate: fromDate, toDate: toDate).subscribe(
+      onCompleted: {
+        print("[PolarPlugin] deleteDeviceDateFolders completed successfully")
+        result(nil)
+      },
+      onError: { error in
+        print("[PolarPlugin] deleteDeviceDateFolders error: \(error.localizedDescription)")
+        
+        let errorCode: String
+        if let polarError = error as? PolarBleApiError {
+          switch polarError {
+          case .deviceDisconnected:
+            errorCode = PolarErrorCode.deviceDisconnected
+          case .operationNotSupported:
+            errorCode = PolarErrorCode.notSupported
+          default:
+            errorCode = PolarErrorCode.bluetoothError
+          }
+        } else if error.localizedDescription.lowercased().contains("timeout") {
+          errorCode = PolarErrorCode.timeout
+        } else if error.localizedDescription.lowercased().contains("no such file") {
+          errorCode = "NO_SUCH_FILE_OR_DIRECTORY"
+        } else {
+          errorCode = PolarErrorCode.bluetoothError
+        }
+        
+        result(FlutterError(
+          code: errorCode,
+          message: error.localizedDescription,
+          details: nil))
+      }
+    )
   }
 }
 

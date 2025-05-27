@@ -235,6 +235,7 @@ class PolarPlugin :
             "getSleepRecordingState" -> getSleepRecordingState(call, result)
             "setupSleepStateObservation" -> setupSleepStateObservation(call, result)
             "get247PPiSamples" -> get247PPiSamples(call, result)
+            "deleteDeviceDateFolders" -> deleteDeviceDateFolders(call, result)
             else -> result.notImplemented()
         }
     }
@@ -1257,6 +1258,35 @@ class PolarPlugin :
                         else -> PolarErrorCode.BLUETOOTH_ERROR
                     }
                     result.error(errorCode, it.message, null)
+                }
+            })
+            .discard()
+    }
+
+    private fun deleteDeviceDateFolders(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        val fromDate = LocalDate.parse(arguments[1] as String)
+        val toDate = LocalDate.parse(arguments[2] as String)
+
+        println("[PolarPlugin] deleteDeviceDateFolders called with fromDate=$fromDate, toDate=$toDate")
+
+        wrapper.api
+            .deleteDeviceDateFolders(identifier, fromDate, toDate)
+            .subscribe({
+                println("[PolarPlugin] deleteDeviceDateFolders completed successfully")
+                runOnUiThread { result.success(null) }
+            }, { error ->
+                println("[PolarPlugin] deleteDeviceDateFolders error: ${error.message}")
+                runOnUiThread {
+                    val errorCode = when {
+                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()

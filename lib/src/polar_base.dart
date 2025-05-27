@@ -1223,7 +1223,70 @@ class Polar {
       throw PolarDataException('Error processing 24/7 PPi data: $e');
     }
   }
-  
+
+  /// Deletes device day (YYYYMMDD) folders from the given date range from a device.
+  /// The date range is inclusive. Deletes the day folder (plus all sub-folders with any contents).
+  /// 
+  /// Note: If some date folders don't exist, the operation will continue and delete other existing folders.
+  /// The operation is considered successful as long as the device is connected and the operation is supported.
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address
+  ///   - fromDate: The starting date to delete date folders from
+  ///   - toDate: The ending date of last date to delete folders from
+  /// - Returns: Future<void> that completes when date folders are successfully deleted
+  ///   - onError: Possible errors thrown as exceptions
+  Future<void> deleteDeviceDateFolders(
+    String identifier,
+    DateTime fromDate,
+    DateTime toDate,
+  ) async {
+    try {
+      // Validate dates
+      if (fromDate.isAfter(toDate)) {
+        throw PolarDataException('fromDate must be before toDate');
+      }
+
+      if (fromDate.isAfter(DateTime.now())) {
+        throw PolarDataException('fromDate cannot be in the future');
+      }
+
+      // Extract just the date part in YYYY-MM-DD format using local time
+      final fromDateStr = '${fromDate.year}-${fromDate.month.toString().padLeft(2, '0')}-${fromDate.day.toString().padLeft(2, '0')}';
+      final toDateStr = '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}';
+      
+      // Log for debugging
+      debugPrint('Polar deleteDeviceDateFolders: for device $identifier from=$fromDate, to=$toDate');
+      debugPrint('Polar deleteDeviceDateFolders: sending fromDateStr=$fromDateStr, toDateStr=$toDateStr');
+
+      await _channel.invokeMethod(
+        'deleteDeviceDateFolders',
+        [
+          identifier,
+          fromDateStr,
+          toDateStr,
+        ],
+      );
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        case 'NO_SUCH_FILE_OR_DIRECTORY':
+          // For cleanup operations, missing folders are not an error - the goal is achieved
+          debugPrint('Polar deleteDeviceDateFolders: some or all date folders were already missing, which is fine for cleanup');
+          return; // Treat as successful completion
+        default:
+          throw PolarBluetoothOperationException('Failed to delete device date folders: ${e.message}', e);
+      }
+    } catch (e) {
+      throw PolarDataException('Error deleting device date folders: $e');
+    }
+  }
+
   // Helper method to set up an observation channel
   Stream<bool> _setupObservationChannel(String channelName, String identifier) async* {
     try {

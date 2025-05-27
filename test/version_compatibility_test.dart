@@ -6,15 +6,15 @@ void main() {
 
   group('Polar SDK Version Compatibility Tests', () {
     test('SDK version matches latest official version', () {
-      expect(PolarVersionCompatibility.currentSdkVersion, '6.2.0');
+      expect(PolarVersionCompatibility.currentSdkVersion, '6.3.0');
     });
 
     test('Version comparison works correctly', () {
-      expect(PolarVersionCompatibility.compareVersions('6.2.0', '6.2.0'), 0);
-      expect(PolarVersionCompatibility.compareVersions('6.2.0', '6.1.0'), 1);
-      expect(PolarVersionCompatibility.compareVersions('6.1.0', '6.2.0'), -1);
-      expect(PolarVersionCompatibility.compareVersions('6.2.0', '6.2.1'), -1);
-      expect(PolarVersionCompatibility.compareVersions('6.2.1', '6.2.0'), 1);
+      expect(PolarVersionCompatibility.compareVersions('6.3.0', '6.3.0'), 0);
+      expect(PolarVersionCompatibility.compareVersions('6.3.0', '6.2.0'), 1);
+      expect(PolarVersionCompatibility.compareVersions('6.2.0', '6.3.0'), -1);
+      expect(PolarVersionCompatibility.compareVersions('6.3.0', '6.3.1'), -1);
+      expect(PolarVersionCompatibility.compareVersions('6.3.1', '6.3.0'), 1);
     });
 
     test('Feature compatibility checks work correctly', () {
