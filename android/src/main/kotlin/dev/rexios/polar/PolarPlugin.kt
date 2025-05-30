@@ -617,6 +617,9 @@ class PolarPlugin :
         val feature = gson.fromJson(arguments[1] as String, PolarDeviceDataType::class.java)
         val settings = gson.fromJson(arguments[2] as String, PolarSensorSetting::class.java)
 
+        // Flag to prevent double responses
+        var resultSent = false
+
         try {
             wrapper.api
                 .startOfflineRecording(identifier, feature, settings)
@@ -625,24 +628,35 @@ class PolarPlugin :
                 }
                 .onErrorResumeNext { error ->
                     runOnUiThread {
-                        val errorCode = when {
-                            error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
-                            error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
-                            error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
-                            error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
-                            else -> "ERROR_STARTING_RECORDING"
+                        if (!resultSent) {
+                            resultSent = true
+                            val errorCode = when {
+                                error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                                error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                                error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                                error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                                else -> "ERROR_STARTING_RECORDING"
+                            }
+                            result.error(errorCode, error.message, null)
                         }
-                        result.error(errorCode, error.message, null)
                     }
                     Completable.complete() // Return a completed Completable to prevent error propagation
                 }
                 .subscribe({
-                    runOnUiThread { result.success(null) }
+                    runOnUiThread { 
+                        if (!resultSent) {
+                            resultSent = true
+                            result.success(null) 
+                        }
+                    }
                 }, { error ->
                     // This should only be called if onErrorResumeNext somehow fails
                     runOnUiThread {
-                        System.err.println("Error in subscribe: " + error.message)
-                        result.error("UNEXPECTED_ERROR", error.message, null)
+                        if (!resultSent) {
+                            resultSent = true
+                            System.err.println("Error in subscribe: " + error.message)
+                            result.error("UNEXPECTED_ERROR", error.message, null)
+                        }
                     }
                 })
                 .discard()
@@ -657,8 +671,11 @@ class PolarPlugin :
             }
             
             runOnUiThread {
-                System.err.println("Exception before RxJava chain: " + e.message)
-                result.error(errorCode, e.message, null)
+                if (!resultSent) {
+                    resultSent = true
+                    System.err.println("Exception before RxJava chain: " + e.message)
+                    result.error(errorCode, e.message, null)
+                }
             }
         }
     }
