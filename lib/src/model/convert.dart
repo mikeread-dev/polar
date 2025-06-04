@@ -129,7 +129,7 @@ class PolarSampleTimestampConverter extends JsonConverter<DateTime, int> {
   @override
   DateTime fromJson(int json) {
     final millis = json ~/ 1000;
-    return DateTime.fromMicrosecondsSinceEpoch(_polarEpoch + millis);
+    return DateTime.fromMicrosecondsSinceEpoch(_polarEpoch + millis, isUtc: true);
   }
 
   @override
