@@ -236,6 +236,7 @@ class PolarPlugin :
             "setupSleepStateObservation" -> setupSleepStateObservation(call, result)
             "get247PPiSamples" -> get247PPiSamples(call, result)
             "deleteDeviceDateFolders" -> deleteDeviceDateFolders(call, result)
+            "deleteStoredDeviceData" -> deleteStoredDeviceData(call, result)
             else -> result.notImplemented()
         }
     }
@@ -1286,15 +1287,78 @@ class PolarPlugin :
         val fromDate = LocalDate.parse(arguments[1] as String)
         val toDate = LocalDate.parse(arguments[2] as String)
 
-        println("[PolarPlugin] deleteDeviceDateFolders called with fromDate=$fromDate, toDate=$toDate")
+        println("[PolarPlugin] deleteDeviceDateFolders called with identifier=$identifier, fromDate=$fromDate, toDate=$toDate")
 
         wrapper.api
             .deleteDeviceDateFolders(identifier, fromDate, toDate)
+            .doOnSubscribe { 
+                println("[PolarPlugin] Starting deleteDeviceDateFolders operation")
+            }
+            .doOnComplete {
+                println("[PolarPlugin] deleteDeviceDateFolders operation completed - folders between $fromDate and $toDate processed")
+            }
             .subscribe({
                 println("[PolarPlugin] deleteDeviceDateFolders completed successfully")
                 runOnUiThread { result.success(null) }
             }, { error ->
                 println("[PolarPlugin] deleteDeviceDateFolders error: ${error.message}")
+                runOnUiThread {
+                    val errorCode = when {
+                        error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, error.message, null)
+                }
+            })
+            .discard()
+    }
+
+    private fun deleteStoredDeviceData(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        val dataTypeStr = arguments[1] as String
+        val untilDateStr = arguments[2] as String
+
+        println("[PolarPlugin] deleteStoredDeviceData called with identifier=$identifier, dataType=$dataTypeStr, until=$untilDateStr")
+
+        // Parse the date string (YYYY-MM-DD format)
+        val untilDate = LocalDate.parse(untilDateStr)
+        
+        // Convert string to PolarStoredDataType
+        val dataType = when (dataTypeStr) {
+            "ACTIVITY" -> PolarBleApi.PolarStoredDataType.ACTIVITY
+            "AUTO_SAMPLE" -> PolarBleApi.PolarStoredDataType.AUTO_SAMPLE
+            "DAILY_SUMMARY" -> PolarBleApi.PolarStoredDataType.DAILY_SUMMARY
+            "NIGHTLY_RECOVERY" -> PolarBleApi.PolarStoredDataType.NIGHTLY_RECOVERY
+            "SDLOGS" -> PolarBleApi.PolarStoredDataType.SDLOGS
+            "SLEEP" -> PolarBleApi.PolarStoredDataType.SLEEP
+            "SLEEP_SCORE" -> PolarBleApi.PolarStoredDataType.SLEEP_SCORE
+            "SKIN_CONTACT_CHANGES" -> PolarBleApi.PolarStoredDataType.SKIN_CONTACT_CHANGES
+            "SKIN_TEMP" -> PolarBleApi.PolarStoredDataType.SKIN_TEMP
+            else -> {
+                runOnUiThread {
+                    result.error(PolarErrorCode.INVALID_ARGUMENT, "Unknown data type: $dataTypeStr", null)
+                }
+                return
+            }
+        }
+
+        wrapper.api
+            .deleteStoredDeviceData(identifier, dataType, untilDate)
+            .doOnSubscribe { 
+                println("[PolarPlugin] Starting deleteStoredDeviceData operation for $dataTypeStr until $untilDate")
+            }
+            .doOnComplete {
+                println("[PolarPlugin] deleteStoredDeviceData operation completed for $dataTypeStr")
+            }
+            .subscribe({
+                println("[PolarPlugin] deleteStoredDeviceData completed successfully for $dataTypeStr")
+                runOnUiThread { result.success(null) }
+            }, { error ->
+                println("[PolarPlugin] deleteStoredDeviceData error for $dataTypeStr: ${error.message}")
                 runOnUiThread {
                     val errorCode = when {
                         error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"

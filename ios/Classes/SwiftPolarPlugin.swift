@@ -160,6 +160,8 @@ public class SwiftPolarPlugin:
         get247PPiSamples(call, result)
       case "deleteDeviceDateFolders":
         deleteDeviceDateFolders(call, result)
+      case "deleteStoredDeviceData":
+        deleteStoredDeviceData(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -1498,6 +1500,109 @@ public class SwiftPolarPlugin:
           details: nil))
       }
     )
+  }
+
+  func deleteStoredDeviceData(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let api = api else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "API not initialized",
+        details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [Any],
+          let identifier = args[0] as? String,
+          let dataTypeStr = args[1] as? String,
+          let untilDateStr = args[2] as? String else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid arguments",
+        details: nil))
+      return
+    }
+    
+    // Parse the date string (YYYY-MM-DD format)
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd"
+    dateFormatter.timeZone = TimeZone.current
+    
+    guard let untilDate = dateFormatter.date(from: untilDateStr) else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid date format. Expected YYYY-MM-DD",
+        details: nil))
+      return
+    }
+    
+    // Convert string to PolarStoredDataType
+    guard let dataType = mapStringToStoredDataType(dataTypeStr) else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Unknown data type: \(dataTypeStr)",
+        details: nil))
+      return
+    }
+    
+    print("[PolarPlugin] deleteStoredDeviceData called with identifier=\(identifier), dataType=\(dataTypeStr), until=\(untilDate)")
+    
+    _ = api.deleteStoredDeviceData(identifier, dataType: dataType, until: untilDate).subscribe(
+      onCompleted: {
+        print("[PolarPlugin] deleteStoredDeviceData completed successfully for \(dataTypeStr)")
+        result(nil)
+      },
+      onError: { error in
+        print("[PolarPlugin] deleteStoredDeviceData error for \(dataTypeStr): \(error.localizedDescription)")
+        
+        let errorCode: String
+        if let polarError = error as? PolarBleApiError {
+          switch polarError {
+          case .deviceDisconnected:
+            errorCode = PolarErrorCode.deviceDisconnected
+          case .operationNotSupported:
+            errorCode = PolarErrorCode.notSupported
+          default:
+            errorCode = PolarErrorCode.bluetoothError
+          }
+        } else if error.localizedDescription.lowercased().contains("timeout") {
+          errorCode = PolarErrorCode.timeout
+        } else if error.localizedDescription.lowercased().contains("no such file") {
+          errorCode = "NO_SUCH_FILE_OR_DIRECTORY"
+        } else {
+          errorCode = PolarErrorCode.bluetoothError
+        }
+        
+        result(FlutterError(
+          code: errorCode,
+          message: error.localizedDescription,
+          details: nil))
+      }
+    )
+  }
+  
+  private func mapStringToStoredDataType(_ dataTypeStr: String) -> PolarStoredDataType? {
+    switch dataTypeStr {
+    case "ACTIVITY":
+      return .activity
+    case "AUTO_SAMPLE":
+      return .autoSample
+    case "DAILY_SUMMARY":
+      return .dailySummary
+    case "NIGHTLY_RECOVERY":
+      return .nightlyRecovery
+    case "SDLOGS":
+      return .sdLogs
+    case "SLEEP":
+      return .sleep
+    case "SLEEP_SCORE":
+      return .sleepScore
+    case "SKIN_CONTACT_CHANGES":
+      return .skinContactChanges
+    case "SKIN_TEMP":
+      return .skinTemp
+    default:
+      return nil
+    }
   }
 }
 

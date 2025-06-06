@@ -1287,6 +1287,60 @@ class Polar {
     }
   }
 
+  /// Deletes stored data of a specific type from the device until the specified date.
+  /// This is more granular than deleteDeviceDateFolders and targets specific data types.
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address
+  ///   - dataType: The type of data to delete (ACTIVITY, SLEEP, DAILY_SUMMARY, etc.)
+  ///   - until: Delete data until this date (inclusive)
+  /// - Returns: Future<void> that completes when data is successfully deleted
+  Future<void> deleteStoredDeviceData(
+    String identifier,
+    String dataType,
+    DateTime until,
+  ) async {
+    try {
+      // Validate date
+      if (until.isAfter(DateTime.now())) {
+        throw PolarDataException('until date cannot be in the future');
+      }
+
+      // Extract just the date part in YYYY-MM-DD format using local time
+      final untilDateStr = '${until.year}-${until.month.toString().padLeft(2, '0')}-${until.day.toString().padLeft(2, '0')}';
+      
+      // Log for debugging
+      debugPrint('Polar deleteStoredDeviceData: for device $identifier type=$dataType until=$until');
+      debugPrint('Polar deleteStoredDeviceData: sending untilDateStr=$untilDateStr');
+
+      await _channel.invokeMethod(
+        'deleteStoredDeviceData',
+        [
+          identifier,
+          dataType,
+          untilDateStr,
+        ],
+      );
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        case 'NO_SUCH_FILE_OR_DIRECTORY':
+          // For cleanup operations, missing data is not an error - the goal is achieved
+          debugPrint('Polar deleteStoredDeviceData: data of type $dataType was already missing, which is fine for cleanup');
+          return; // Treat as successful completion
+        default:
+          throw PolarBluetoothOperationException('Failed to delete stored device data: ${e.message}', e);
+      }
+    } catch (e) {
+      throw PolarDataException('Error deleting stored device data: $e');
+    }
+  }
+
   // Helper method to set up an observation channel
   Stream<bool> _setupObservationChannel(String channelName, String identifier) async* {
     try {
