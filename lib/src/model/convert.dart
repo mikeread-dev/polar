@@ -117,7 +117,7 @@ class PolarSettingTypeConverter
   }
 }
 
-final _polarEpoch = DateTime(2000).microsecondsSinceEpoch;
+final _polarEpoch = DateTime.utc(2000).microsecondsSinceEpoch;
 
 /// Convert polar sample timestamps to [DateTime]
 ///
@@ -170,7 +170,7 @@ class MapToDateTimeConverter
       json['hourOfDay'] as int,
       json['minute'] as int,
       json['second'] as int,
-    );
+    ).toUtc();
   }
 
   @override

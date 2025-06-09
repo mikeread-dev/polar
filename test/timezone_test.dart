@@ -1,10 +1,8 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:polar/polar.dart';
-import 'package:flutter/foundation.dart';
 
 const identifier = 'UTC10_device';
 const utcPlus10Offset = Duration(hours: 10);
@@ -14,12 +12,12 @@ void main() {
   
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(MethodChannel('polar'), handleUTC10TimezoneMock);
+        .setMockMethodCallHandler(const MethodChannel('polar'), handleUTC10TimezoneMock);
   });
   
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(MethodChannel('polar'), null);
+        .setMockMethodCallHandler(const MethodChannel('polar'), null);
   });
 
   group('UTC+10 timezone handling tests', () {
@@ -66,7 +64,7 @@ void main() {
       // but will succeed on the second attempt if checking recording state first
       
       // First approach (will fail with 106 error)
-      bool directStopFailed = false;
+      var directStopFailed = false;
       try {
         await polar.stopSleepRecording(identifier);
       } catch (e) {
@@ -119,7 +117,7 @@ Future<dynamic> handleUTC10TimezoneMock(MethodCall methodCall) async {
             'sleepCycles': [
               {
                 'secondsFromSleepStart': 3600,
-                'sleepDepthStart': 0.8
+                'sleepDepthStart': 0.8,
               }
             ],
             'sleepEndOffsetSeconds': 28800,
@@ -131,10 +129,10 @@ Future<dynamic> handleUTC10TimezoneMock(MethodCall methodCall) async {
             'sleepWakePhases': [
               {
                 'secondsFromSleepStart': 1800,
-                'state': 'DEEP_SLEEP'
+                'state': 'DEEP_SLEEP',
               }
-            ]
-          }
+            ],
+          },
         }
       ];
       

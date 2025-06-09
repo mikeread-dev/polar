@@ -8,8 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:polar/polar.dart';
 import 'package:polar/src/model/convert.dart';
-import 'package:polar/src/model/polar_247_ppi_samples_data.dart';
-import 'package:polar/src/model/polar_offline_recording_data.dart';
 
 /// Flutter implementation of the [PolarBleSdk]
 class Polar {
@@ -1165,64 +1163,7 @@ class Polar {
     return _setupObservationChannel(channelName, identifier);
   }
   
-  /// Get 24/7 PPi samples from a device for a given period.
-  ///
-  /// - Parameters:
-  ///   - identifier: Polar device id or address
-  ///   - fromDate: The starting date of the period to retrieve 24/7 PPi data from
-  ///   - toDate: The ending date of the period to retrieve 24/7 PPi data from
-  /// - Returns: A list of Polar247PPiSamplesData representing the 24/7 PPi data for the specified period
-  ///   - onError: Possible errors thrown as exceptions
-  Future<List<Polar247PPiSamplesData>> get247PPiSamples(
-    String identifier,
-    DateTime fromDate,
-    DateTime toDate,
-  ) async {
-    try {
-      // Validate dates
-      if (fromDate.isAfter(toDate)) {
-        throw PolarDataException('fromDate must be before toDate');
-      }
-
-      if (fromDate.isAfter(DateTime.now())) {
-        throw PolarDataException('fromDate cannot be in the future');
-      }
-
-      // Log for debugging
-      debugPrint('Polar get247PPiSamples: for device $identifier from=$fromDate, to=$toDate');
-
-      final response = await _channel.invokeMethod(
-        'get247PPiSamples',
-        [
-          identifier,
-          fromDate.millisecondsSinceEpoch,
-          toDate.millisecondsSinceEpoch,
-        ],
-      );
-      debugPrint('Polar get247PPiSamples: response is $response');
-      if (response == null) return [];
-
-      if (response is String) {
-        final List<dynamic> parsed = jsonDecode(response);
-        return parsed
-            .map((json) => Polar247PPiSamplesData.fromJson(json as Map<String, dynamic>))
-            .toList();
-      }
-
-      throw PolarDataException('Unexpected response type: ${response.runtimeType}');
-    } on PlatformException catch (e) {
-      switch (e.code) {
-        case 'device_disconnected':
-          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
-        case 'not_supported':
-          throw PolarNotSupportedException('24/7 PPi data not supported on device $identifier', e);
-        default:
-          throw PolarBluetoothOperationException('Failed to get 24/7 PPi data: ${e.message}', e);
-      }
-    } catch (e) {
-      throw PolarDataException('Error processing 24/7 PPi data: $e');
-    }
-  }
+ 
 
   /// Deletes device day (YYYYMMDD) folders from the given date range from a device.
   /// The date range is inclusive. Deletes the day folder (plus all sub-folders with any contents).
