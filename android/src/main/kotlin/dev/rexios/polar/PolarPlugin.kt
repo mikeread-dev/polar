@@ -1065,13 +1065,29 @@ class PolarPlugin :
             return
         }
 
+        println("[PolarPlugin] isFtuDone called for device $identifier")
+
         wrapper.api
             .isFtuDone(identifier)
+            .doOnError { error -> 
+                println("[PolarPlugin] Error in isFtuDone: ${error.message}")
+                System.err.println("The error message is: " + error.message) 
+            }
             .subscribe({ isFtuDone ->
+                println("[PolarPlugin] isFtuDone result: $isFtuDone")
                 runOnUiThread { result.success(isFtuDone) }
-            }, {
+            }, { error ->
+                println("[PolarPlugin] Error getting FTU status: ${error.message}")
                 runOnUiThread {
-                    result.error(it.toString(), it.message, null)
+                    val errorCode = when {
+                        error.message?.contains("PftpOperationTimeout") == true -> PolarErrorCode.TIMEOUT
+                        error.message?.contains("Air packet was not received") == true -> PolarErrorCode.TIMEOUT
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, error.message, null)
                 }
             })
             .discard()
