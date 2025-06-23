@@ -69,8 +69,17 @@ public class SwiftPolarPlugin:
 
   // Add the method back to conform to FlutterPlugin protocol
   public static func register(with registrar: FlutterPluginRegistrar) {
-    // This method is required by the FlutterPlugin protocol but we'll use the implementation from PolarPluginBridge
-    // The actual implementation is in PolarPluginBridge
+    let channel = FlutterMethodChannel(name: "polar", binaryMessenger: registrar.messenger())
+    let searchChannel = FlutterEventChannel(name: "polar/search", binaryMessenger: registrar.messenger())
+    
+    let instance = SwiftPolarPlugin(
+        messenger: registrar.messenger(),
+        channel: channel,
+        searchChannel: searchChannel
+    )
+    
+    registrar.addMethodCallDelegate(instance, channel: channel)
+    searchChannel.setStreamHandler(instance.searchHandler)
   }
 
   private func initApi() {
@@ -156,8 +165,7 @@ public class SwiftPolarPlugin:
         getSleepRecordingState(call, result)
       case "setupSleepStateObservation":
         setupSleepStateObservation(call, result)
-      case "get247PPiSamples":
-        get247PPiSamples(call, result)
+
       case "deleteDeviceDateFolders":
         deleteDeviceDateFolders(call, result)
       case "deleteStoredDeviceData":
@@ -1070,53 +1078,30 @@ public class SwiftPolarPlugin:
     // For debugging
     print("[PolarPlugin] getSleep called with fromDate=\(fromDateStr), toDate=\(toDateStr)")
     
-    // Convert to LocalDate objects for the Polar SDK
-    let calendar = Calendar.current
-    let fromLocalDate = try? DateComponents(
-        calendar: calendar,
-        year: calendar.component(.year, from: fromDate),
-        month: calendar.component(.month, from: fromDate),
-        day: calendar.component(.day, from: fromDate)
-    ).toLocalDate()
-    
-    let toLocalDate = try? DateComponents(
-        calendar: calendar,
-        year: calendar.component(.year, from: toDate),
-        month: calendar.component(.month, from: toDate),
-        day: calendar.component(.day, from: toDate)
-    ).toLocalDate()
-    
-    guard let fromLocalDate = fromLocalDate, let toLocalDate = toLocalDate else {
-        result(FlutterError(
-          code: PolarErrorCode.invalidArgument,
-          message: "Failed to convert dates to local date format",
-          details: nil))
-        return
-    }
-    
-    _ = api.getSleep(identifier, fromDate: fromLocalDate, toDate: toLocalDate).subscribe(
-        onSuccess: { sleepDataList in
-            print("[PolarPlugin] getSleep received \(sleepDataList.count) sleep records")
+    // Use the correct iOS API method getSleepData
+    _ = api.getSleepData(identifier: identifier, fromDate: fromDate, toDate: toDate).subscribe(
+        onSuccess: { sleepAnalysisResults in
+            print("[PolarPlugin] getSleepData received \(sleepAnalysisResults.count) sleep analysis results")
             
             // For debugging
-            for sleepData in sleepDataList {
-                print("[PolarPlugin] Sleep data date: \(String(describing: sleepData.date)), result date: \(String(describing: sleepData.result?.sleepResultDate))")
+            for sleepResult in sleepAnalysisResults {
+                print("[PolarPlugin] Sleep analysis result date: \(sleepResult.sleepResultDate)")
             }
             
             // Convert to JSON and return
-            guard let jsonData = try? JSONEncoder().encode(sleepDataList) else {
+            do {
+                let jsonData = try JSONEncoder().encode(sleepAnalysisResults)
+                let jsonString = String(data: jsonData, encoding: .utf8)
+                result(jsonString)
+            } catch {
                 result(FlutterError(
                   code: "ENCODING_ERROR",
-                  message: "Failed to encode sleep data to JSON",
+                  message: "Failed to encode sleep data to JSON: \(error.localizedDescription)",
                   details: nil))
-                return
             }
-            
-            let jsonString = String(data: jsonData, encoding: .utf8)
-            result(jsonString)
         },
         onFailure: { error in
-            print("[PolarPlugin] getSleep error: \(error.localizedDescription)")
+            print("[PolarPlugin] getSleepData error: \(error.localizedDescription)")
             let errorCode = self.mapErrorCode(error)
             result(FlutterError(
               code: errorCode,
@@ -1143,7 +1128,7 @@ public class SwiftPolarPlugin:
             print("[PolarPlugin] Device time before stopping sleep recording: \(deviceTime)")
             
             // Now stop the sleep recording
-            _ = self.api.stopSleepRecording(identifier).subscribe(
+            _ = self.api.stopSleepRecording(identifier: identifier).subscribe(
                 onCompleted: {
                     print("[PolarPlugin] Successfully stopped sleep recording")
                     result(nil)
@@ -1164,7 +1149,7 @@ public class SwiftPolarPlugin:
             print("[PolarPlugin] Could not get device time: \(error.localizedDescription)")
             
             // Continue with stopping sleep recording even if we can't get the time
-            _ = self.api.stopSleepRecording(identifier).subscribe(
+            _ = self.api.stopSleepRecording(identifier: identifier).subscribe(
                 onCompleted: {
                     result(nil)
                 },
@@ -1193,7 +1178,7 @@ public class SwiftPolarPlugin:
     
     print("[PolarPlugin] getSleepRecordingState called for device \(identifier)")
     
-    _ = api.getSleepRecordingState(identifier).subscribe(
+    _ = api.getSleepRecordingState(identifier: identifier).subscribe(
         onSuccess: { isRecording in
             print("[PolarPlugin] getSleepRecordingState result: \(isRecording)")
             result(isRecording)
@@ -1221,11 +1206,12 @@ public class SwiftPolarPlugin:
     let eventChannel = FlutterEventChannel(name: eventChannelName, binaryMessenger: messenger)
     
     // Set up the handler for the event channel
+    var stateSubscription: Disposable?
     let streamHandler = StreamHandler(
         onListen: { _, events in
             print("[PolarPlugin] Starting sleep state observation for \(identifier)")
             
-            let stateSubscription = self.api.observeSleepRecordingState(identifier).subscribe(
+            stateSubscription = self.api.observeSleepRecordingState(identifier: identifier).subscribe(
                 onNext: { state in
                     print("[PolarPlugin] Sleep state changed: \(state[0])")
                     DispatchQueue.main.async {
@@ -1251,11 +1237,11 @@ public class SwiftPolarPlugin:
                 }
             )
             
-            return stateSubscription
+            return nil
         },
-        onCancel: { subscription in
+        onCancel: { _ in
             print("[PolarPlugin] Cancelling sleep state observation for \(identifier)")
-            (subscription as? Disposable)?.dispose()
+            stateSubscription?.dispose()
             return nil
         }
     )
@@ -1270,167 +1256,41 @@ public class SwiftPolarPlugin:
   private func mapErrorCode(_ error: Error) -> String {
     if let polarError = error as? PolarErrors {
         switch polarError {
-        case .deviceDisconnected:
+        case .deviceNotConnected:
+            return PolarErrorCode.deviceDisconnected
+        case .deviceNotFound:
             return PolarErrorCode.deviceDisconnected
         case .operationNotSupported:
             return PolarErrorCode.notSupported
-        case .bluetoothNotEnabled, .bluetoothNotAvailable:
-            return PolarErrorCode.bluetoothError
-        case .deviceNotConnected, .deviceNotFound:
-            return PolarErrorCode.deviceDisconnected
-        case .operationOngoing, .serviceNotFound:
+        case .serviceNotFound:
             return PolarErrorCode.operationNotAllowed
-        default:
-            if error.localizedDescription.contains("106") {
-                return PolarErrorCode.bluetoothError
-            }
+        case .notificationNotEnabled:
+            return PolarErrorCode.operationNotAllowed
+        case .unableToStartStreaming:
+            return PolarErrorCode.operationNotAllowed
+        case .invalidArgument:
+            return PolarErrorCode.invalidArgument
+        case .messageEncodeFailed, .messageDecodeFailed:
+            return PolarErrorCode.bluetoothError
+        case .dateTimeFormatFailed:
+            return PolarErrorCode.invalidArgument
+        case .polarBleSdkInternalException, .deviceError, .polarOfflineRecordingError:
             return PolarErrorCode.bluetoothError
         }
     }
     
-    if error.localizedDescription.contains("timeout") {
+    // Fallback to string matching for other error types
+    let errorDescription = error.localizedDescription.lowercased()
+    if errorDescription.contains("timeout") {
         return PolarErrorCode.timeout
+    } else if errorDescription.contains("bluetooth") || errorDescription.contains("106") {
+        return PolarErrorCode.bluetoothError
     }
     
-    return "error"
+    return PolarErrorCode.bluetoothError
   }
 
-  func get247PPiSamples(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
-    guard let api = api else {
-      result(FlutterError(
-        code: PolarErrorCode.bluetoothError,
-        message: "API not initialized",
-        details: nil))
-      return
-    }
-    
-    guard let args = call.arguments as? [Any],
-          let identifier = args[0] as? String,
-          let fromDateMillis = args[1] as? Int64,
-          let toDateMillis = args[2] as? Int64 else {
-      result(FlutterError(
-        code: PolarErrorCode.invalidArgument,
-        message: "Invalid arguments",
-        details: nil))
-      return
-    }
-    
-    let fromDate = Date(timeIntervalSince1970: Double(fromDateMillis) / 1000)
-    let toDate = Date(timeIntervalSince1970: Double(toDateMillis) / 1000)
-    
-    print("[PolarPlugin] get247PPiSamples called with fromDate=\(fromDate), toDate=\(toDate)")
-    
-    _ = api.get247PPiSamples(identifier, fromDate: fromDate, toDate: toDate).subscribe(
-      onSuccess: { ppiSamplesList in
-        print("[PolarPlugin] get247PPiSamples received \(ppiSamplesList.count) samples")
-        
-        // Debug the data we're getting back
-        for ppiSample in ppiSamplesList {
-          print("[PolarPlugin] PPi sample date: \(ppiSample.date)")
-        }
-        
-        let jsonArray = ppiSamplesList.map { ppiSample -> [String: Any] in
-          let statusList = ppiSample.samples.statusList.map { status -> [String: String] in
-            return [
-              "skinContact": self.skinContactToString(status.skinContact),
-              "movement": self.movementToString(status.movement),
-              "intervalStatus": self.intervalStatusToString(status.intervalStatus)
-            ]
-          }
-          
-          return [
-            "date": ppiSample.date.timeIntervalSince1970 * 1000, // Convert to milliseconds
-            "samples": [
-              "startTime": ppiSample.samples.startTime.description,
-              "triggerType": self.triggerTypeToString(ppiSample.samples.triggerType),
-              "ppiValueList": ppiSample.samples.ppiValueList,
-              "ppiErrorEstimateList": ppiSample.samples.ppiErrorEstimateList,
-              "statusList": statusList
-            ]
-          ]
-        }
-        
-        if let jsonData = try? JSONSerialization.data(withJSONObject: jsonArray),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-          self.handleResult(result, jsonString)
-        } else {
-          result(FlutterError(
-            code: PolarErrorCode.invalidArgument,
-            message: "Failed to serialize data",
-            details: nil))
-        }
-      },
-      onError: { error in
-        print("[PolarPlugin] get247PPiSamples error: \(error.localizedDescription)")
-        
-        let errorCode: String
-        if let polarError = error as? PolarBleApiError {
-          switch polarError {
-          case .deviceDisconnected:
-            errorCode = PolarErrorCode.deviceDisconnected
-          case .operationNotSupported:
-            errorCode = PolarErrorCode.notSupported
-          default:
-            errorCode = PolarErrorCode.bluetoothError
-          }
-        } else if error.localizedDescription.lowercased().contains("timeout") {
-          errorCode = PolarErrorCode.timeout
-        } else {
-          errorCode = PolarErrorCode.bluetoothError
-        }
-        
-        result(FlutterError(
-          code: errorCode,
-          message: error.localizedDescription,
-          details: nil))
-      }
-    )
-  }
 
-  // Helper methods to convert enums to strings
-  func skinContactToString(_ skinContact: PPiSampleStatus.SkinContact) -> String {
-    switch skinContact {
-    case .undefined:
-      return "SKIN_CONTACT_UNDEFINED"
-    case .ok:
-      return "SKIN_CONTACT_OK"
-    case .notOk:
-      return "SKIN_CONTACT_NOT_OK"
-    }
-  }
-
-  func movementToString(_ movement: PPiSampleStatus.Movement) -> String {
-    switch movement {
-    case .undefined:
-      return "MOVEMENT_UNDEFINED"
-    case .ok:
-      return "MOVEMENT_OK"
-    case .notOk:
-      return "MOVEMENT_NOT_OK"
-    }
-  }
-
-  func intervalStatusToString(_ intervalStatus: PPiSampleStatus.IntervalStatus) -> String {
-    switch intervalStatus {
-    case .undefined:
-      return "INTERVAL_STATUS_UNDEFINED"
-    case .valid:
-      return "INTERVAL_STATUS_VALID"
-    case .invalid:
-      return "INTERVAL_STATUS_INVALID"
-    }
-  }
-
-  func triggerTypeToString(_ triggerType: PPiSampleTriggerType) -> String {
-    switch triggerType {
-    case .undefined:
-      return "TRIGGER_TYPE_UNDEFINED"
-    case .automatic:
-      return "TRIGGER_TYPE_AUTOMATIC"
-    case .manual:
-      return "TRIGGER_TYPE_MANUAL"
-    }
-  }
 
   func deleteDeviceDateFolders(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
     guard let api = api else {
@@ -1477,21 +1337,12 @@ public class SwiftPolarPlugin:
         print("[PolarPlugin] deleteDeviceDateFolders error: \(error.localizedDescription)")
         
         let errorCode: String
-        if let polarError = error as? PolarBleApiError {
-          switch polarError {
-          case .deviceDisconnected:
-            errorCode = PolarErrorCode.deviceDisconnected
-          case .operationNotSupported:
-            errorCode = PolarErrorCode.notSupported
-          default:
-            errorCode = PolarErrorCode.bluetoothError
-          }
-        } else if error.localizedDescription.lowercased().contains("timeout") {
+        if error.localizedDescription.lowercased().contains("timeout") {
           errorCode = PolarErrorCode.timeout
         } else if error.localizedDescription.lowercased().contains("no such file") {
           errorCode = "NO_SUCH_FILE_OR_DIRECTORY"
         } else {
-          errorCode = PolarErrorCode.bluetoothError
+          errorCode = self.mapErrorCode(error)
         }
         
         result(FlutterError(
@@ -1536,13 +1387,7 @@ public class SwiftPolarPlugin:
     }
     
     // Convert string to PolarStoredDataType
-    guard let dataType = mapStringToStoredDataType(dataTypeStr) else {
-      result(FlutterError(
-        code: PolarErrorCode.invalidArgument,
-        message: "Unknown data type: \(dataTypeStr)",
-        details: nil))
-      return
-    }
+    let dataType = mapStringToStoredDataType(dataTypeStr)
     
     print("[PolarPlugin] deleteStoredDeviceData called with identifier=\(identifier), dataType=\(dataTypeStr), until=\(untilDate)")
     
@@ -1555,21 +1400,12 @@ public class SwiftPolarPlugin:
         print("[PolarPlugin] deleteStoredDeviceData error for \(dataTypeStr): \(error.localizedDescription)")
         
         let errorCode: String
-        if let polarError = error as? PolarBleApiError {
-          switch polarError {
-          case .deviceDisconnected:
-            errorCode = PolarErrorCode.deviceDisconnected
-          case .operationNotSupported:
-            errorCode = PolarErrorCode.notSupported
-          default:
-            errorCode = PolarErrorCode.bluetoothError
-          }
-        } else if error.localizedDescription.lowercased().contains("timeout") {
+        if error.localizedDescription.lowercased().contains("timeout") {
           errorCode = PolarErrorCode.timeout
         } else if error.localizedDescription.lowercased().contains("no such file") {
           errorCode = "NO_SUCH_FILE_OR_DIRECTORY"
         } else {
-          errorCode = PolarErrorCode.bluetoothError
+          errorCode = self.mapErrorCode(error)
         }
         
         result(FlutterError(
@@ -1580,28 +1416,28 @@ public class SwiftPolarPlugin:
     )
   }
   
-  private func mapStringToStoredDataType(_ dataTypeStr: String) -> PolarStoredDataType? {
+  private func mapStringToStoredDataType(_ dataTypeStr: String) -> PolarStoredDataType.StoredDataType {
     switch dataTypeStr {
     case "ACTIVITY":
-      return .activity
+      return PolarStoredDataType.StoredDataType.ACTIVITY
     case "AUTO_SAMPLE":
-      return .autoSample
+      return PolarStoredDataType.StoredDataType.AUTO_SAMPLE
     case "DAILY_SUMMARY":
-      return .dailySummary
+      return PolarStoredDataType.StoredDataType.DAILY_SUMMARY
     case "NIGHTLY_RECOVERY":
-      return .nightlyRecovery
+      return PolarStoredDataType.StoredDataType.NIGHTLY_RECOVERY
     case "SDLOGS":
-      return .sdLogs
+      return PolarStoredDataType.StoredDataType.SDLOGS
     case "SLEEP":
-      return .sleep
+      return PolarStoredDataType.StoredDataType.SLEEP
     case "SLEEP_SCORE":
-      return .sleepScore
+      return PolarStoredDataType.StoredDataType.SLEEP_SCORE
     case "SKIN_CONTACT_CHANGES":
-      return .skinContactChanges
+      return PolarStoredDataType.StoredDataType.SKIN_CONTACT_CHANGES
     case "SKIN_TEMP":
-      return .skinTemp
+      return PolarStoredDataType.StoredDataType.SKINTEMP
     default:
-      return nil
+      return PolarStoredDataType.StoredDataType.ACTIVITY // Default fallback
     }
   }
 }
