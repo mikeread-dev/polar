@@ -577,6 +577,9 @@ class PolarDiskSpaceDataCodable: Encodable {
     }
 }
 
+// MARK: - Sleep Data Codable
+// Since PolarSleepAnalysisResult is already Codable, we can use it directly
+
 extension Date {
   var millisecondsSince1970: Int64 {
     Int64((timeIntervalSince1970 * 1000).rounded())

@@ -33,12 +33,19 @@ private enum PolarErrorCode {
     static let bluetoothError = "bluetooth_error"
 }
 
+// Wrapper structure to match Flutter's expected PolarSleepData format
+private struct PolarSleepDataWrapper: Encodable {
+    let date: String
+    let result: PolarSleepData.PolarSleepAnalysisResult
+}
+
 public class SwiftPolarPlugin:
   NSObject,
   FlutterPlugin,
   PolarBleApiObserver,
   PolarBleApiPowerStateObserver,
-  PolarBleApiDeviceFeaturesObserver
+  PolarBleApiDeviceFeaturesObserver,
+  PolarBleApiDeviceInfoObserver
 {
   /// Binary messenger for dynamic EventChannel registration
   let messenger: FlutterBinaryMessenger
@@ -90,6 +97,7 @@ public class SwiftPolarPlugin:
     api.observer = self
     api.powerStateObserver = self
     api.deviceFeaturesObserver = self
+    api.deviceInfoObserver = self
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -1062,38 +1070,73 @@ public class SwiftPolarPlugin:
     let fromDateStr = arguments[1] as! String
     let toDateStr = arguments[2] as! String
     
-    // Convert strings to Date objects
+    // Convert strings to Date objects with proper timezone handling
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd"
+    dateFormatter.timeZone = TimeZone.current // Use current timezone
     
     guard let fromDate = dateFormatter.date(from: fromDateStr),
           let toDate = dateFormatter.date(from: toDateStr) else {
         result(FlutterError(
           code: PolarErrorCode.invalidArgument,
-          message: "Invalid date format",
+          message: "Invalid date format. Expected YYYY-MM-DD",
           details: nil))
         return
     }
     
     // For debugging
     print("[PolarPlugin] getSleep called with fromDate=\(fromDateStr), toDate=\(toDateStr)")
+    print("[PolarPlugin] Parsed dates - fromDate=\(fromDate), toDate=\(toDate)")
     
     // Use the correct iOS API method getSleepData
     _ = api.getSleepData(identifier: identifier, fromDate: fromDate, toDate: toDate).subscribe(
         onSuccess: { sleepAnalysisResults in
             print("[PolarPlugin] getSleepData received \(sleepAnalysisResults.count) sleep analysis results")
             
-            // For debugging
-            for sleepResult in sleepAnalysisResults {
-                print("[PolarPlugin] Sleep analysis result date: \(sleepResult.sleepResultDate)")
+            // Enhanced debugging for each sleep result
+            for (index, sleepResult) in sleepAnalysisResults.enumerated() {
+                print("[PolarPlugin] === Sleep Record \(index + 1) Details ===")
+                print("[PolarPlugin] sleepResultDate: \(sleepResult.sleepResultDate ?? "nil")")
+                print("[PolarPlugin] sleepStartTime: \(sleepResult.sleepStartTime?.description ?? "nil")")
+                print("[PolarPlugin] sleepEndTime: \(sleepResult.sleepEndTime?.description ?? "nil")")
+                print("[PolarPlugin] lastModified: \(sleepResult.lastModified?.description ?? "nil")")
+                print("[PolarPlugin] sleepGoalMinutes: \(sleepResult.sleepGoalMinutes?.description ?? "nil")")
+                print("[PolarPlugin] deviceId: \(sleepResult.deviceId ?? "nil")")
+                print("[PolarPlugin] userSleepRating: \(sleepResult.userSleepRating?.rawValue.description ?? "nil")")
+                print("[PolarPlugin] batteryRanOut: \(sleepResult.batteryRanOut?.description ?? "nil")")
+                print("[PolarPlugin] sleepStartOffsetSeconds: \(sleepResult.sleepStartOffsetSeconds?.description ?? "nil")")
+                print("[PolarPlugin] sleepEndOffsetSeconds: \(sleepResult.sleepEndOffsetSeconds?.description ?? "nil")")
+                print("[PolarPlugin] sleepWakePhases count: \(sleepResult.sleepWakePhases?.count ?? 0)")
+                print("[PolarPlugin] sleepCycles count: \(sleepResult.sleepCycles?.count ?? 0)")
+                print("[PolarPlugin] snoozeTime count: \(sleepResult.snoozeTime?.count ?? 0)")
+                print("[PolarPlugin] alarmTime: \(sleepResult.alarmTime?.description ?? "nil")")
+                print("[PolarPlugin] originalSleepRange: \(sleepResult.originalSleepRange != nil ? "present" : "nil")")
+                print("[PolarPlugin] ================================")
             }
             
-            // Convert to JSON and return
+            // Convert to the structure Flutter expects: PolarSleepData with analysis wrapper
             do {
-                let jsonData = try JSONEncoder().encode(sleepAnalysisResults)
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                
+                // Wrap each sleep analysis result in the expected PolarSleepData structure
+                let wrappedSleepData = sleepAnalysisResults.map { analysisResult in
+                    return PolarSleepDataWrapper(
+                        date: analysisResult.sleepResultDate ?? "",
+                        result: analysisResult
+                    )
+                }
+                
+                let jsonData = try encoder.encode(wrappedSleepData)
                 let jsonString = String(data: jsonData, encoding: .utf8)
+                
+                // Log the actual JSON being sent to Flutter
+                print("[PolarPlugin] JSON being sent to Flutter:")
+                print("[PolarPlugin] \(jsonString ?? "nil")")
+                
                 result(jsonString)
             } catch {
+                print("[PolarPlugin] Encoding error: \(error)")
                 result(FlutterError(
                   code: "ENCODING_ERROR",
                   message: "Failed to encode sleep data to JSON: \(error.localizedDescription)",
