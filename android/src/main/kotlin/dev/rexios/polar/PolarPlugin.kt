@@ -29,6 +29,9 @@ import com.polar.sdk.api.model.PolarHealthThermometerData
 import com.polar.sdk.api.model.PolarHrData
 import com.polar.sdk.api.model.PolarSensorSetting
 import com.polar.sdk.api.model.PolarOfflineRecordingEntry
+import com.polar.sdk.api.model.PolarOfflineRecordingTrigger
+import com.polar.sdk.api.model.PolarOfflineRecordingTriggerMode
+import com.polar.sdk.api.model.PolarRecordingSecret
 import com.polar.sdk.api.model.sleep.PolarSleepData
 import com.polar.androidcommunications.api.ble.model.gatt.client.ChargeState
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -237,6 +240,8 @@ class PolarPlugin :
             "get247PPiSamples" -> get247PPiSamples(call, result)
             "deleteDeviceDateFolders" -> deleteDeviceDateFolders(call, result)
             "deleteStoredDeviceData" -> deleteStoredDeviceData(call, result)
+            "setOfflineRecordingTrigger" -> setOfflineRecordingTrigger(call, result)
+            "doRestart" -> doRestart(call, result)
             else -> result.notImplemented()
         }
     }
@@ -1378,6 +1383,96 @@ class PolarPlugin :
                 runOnUiThread {
                     val errorCode = when {
                         error.message?.contains("NO_SUCH_FILE_OR_DIRECTORY") == true -> "NO_SUCH_FILE_OR_DIRECTORY"
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                    }
+                    result.error(errorCode, error.message, null)
+                }
+            })
+            .discard()
+    }
+
+    private fun setOfflineRecordingTrigger(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        val triggerJson = arguments[1] as String
+
+        try {
+            val triggerData = gson.fromJson(triggerJson, Map::class.java) as Map<String, Any>
+            val triggerModeString = triggerData["triggerMode"] as String
+            val triggerFeaturesMap = triggerData["triggerFeatures"] as Map<String, Any?>
+
+            // Convert trigger mode from Dart camelCase to official SDK enum constants
+            val triggerMode = when (triggerModeString) {
+                "triggerDisabled" -> PolarOfflineRecordingTriggerMode.TRIGGER_DISABLED
+                "triggerSystemStart" -> PolarOfflineRecordingTriggerMode.TRIGGER_SYSTEM_START
+                "triggerExerciseStart" -> PolarOfflineRecordingTriggerMode.TRIGGER_EXERCISE_START
+                else -> throw IllegalArgumentException("Unknown trigger mode: $triggerModeString")
+            }
+
+            // Convert trigger features map
+            val triggerFeatures = mutableMapOf<PolarDeviceDataType, PolarSensorSetting?>()
+            triggerFeaturesMap.forEach { (dataTypeString, settingsValue) ->
+                val dataType = when (dataTypeString) {
+                    "ppi" -> PolarDeviceDataType.PPI
+                    "hr" -> PolarDeviceDataType.HR
+                    "ecg" -> PolarDeviceDataType.ECG
+                    "acc" -> PolarDeviceDataType.ACC
+                    "ppg" -> PolarDeviceDataType.PPG
+                    "gyro" -> PolarDeviceDataType.GYRO
+                    "magnetometer" -> PolarDeviceDataType.MAGNETOMETER
+                    "temperature" -> PolarDeviceDataType.TEMPERATURE
+                    "pressure" -> PolarDeviceDataType.PRESSURE
+                    else -> throw IllegalArgumentException("Unknown data type: $dataTypeString")
+                }
+                
+                // For PPI and HR, settings should be null
+                val settings = if (settingsValue != null && dataType != PolarDeviceDataType.PPI && dataType != PolarDeviceDataType.HR) {
+                    gson.fromJson(gson.toJson(settingsValue), PolarSensorSetting::class.java)
+                } else {
+                    null
+                }
+                
+                triggerFeatures[dataType] = settings
+            }
+
+            val trigger = PolarOfflineRecordingTrigger(triggerMode, triggerFeatures)
+
+            wrapper.api
+                .setOfflineRecordingTrigger(identifier, trigger, null)
+                .subscribe({
+                    runOnUiThread { result.success(null) }
+                }, { error ->
+                    runOnUiThread {
+                        val errorCode = when {
+                            error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                            error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                            error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                            else -> PolarErrorCode.BLUETOOTH_ERROR
+                        }
+                        result.error(errorCode, error.message, null)
+                    }
+                })
+                .discard()
+        } catch (e: Exception) {
+            result.error(PolarErrorCode.INVALID_ARGUMENT, "Failed to parse trigger: ${e.message}", null)
+        }
+    }
+
+    private fun doRestart(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        // Note: preservePairingInformation is ignored on Android as the API only takes identifier
+
+        wrapper.api
+            .doRestart(identifier)
+            .subscribe({
+                runOnUiThread { result.success(null) }
+            }, { error ->
+                runOnUiThread {
+                    val errorCode = when {
                         error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
                         error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
                         error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT

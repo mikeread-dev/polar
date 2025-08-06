@@ -178,6 +178,10 @@ public class SwiftPolarPlugin:
         deleteDeviceDateFolders(call, result)
       case "deleteStoredDeviceData":
         deleteStoredDeviceData(call, result)
+      case "setOfflineRecordingTrigger":
+        setOfflineRecordingTrigger(call, result)
+      case "doRestart":
+        doRestart(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -1482,6 +1486,159 @@ public class SwiftPolarPlugin:
     default:
       return PolarStoredDataType.StoredDataType.ACTIVITY // Default fallback
     }
+  }
+
+  func setOfflineRecordingTrigger(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let api = api else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "API not initialized",
+        details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [Any],
+          let identifier = args[0] as? String,
+          let triggerJson = args[1] as? String else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid arguments",
+        details: nil))
+      return
+    }
+    
+    do {
+      guard let triggerData = triggerJson.data(using: .utf8),
+            let triggerDict = try JSONSerialization.jsonObject(with: triggerData) as? [String: Any],
+            let triggerFeaturesDict = triggerDict["triggerFeatures"] as? [String: Any?] else {
+        result(FlutterError(
+          code: PolarErrorCode.invalidArgument,
+          message: "Invalid trigger JSON format",
+          details: nil))
+        return
+      }
+      
+      // Convert trigger mode - now using consistent strings across platforms
+      let triggerMode: PolarOfflineRecordingTriggerMode
+      if let triggerModeString = triggerDict["triggerMode"] as? String {
+        switch triggerModeString {
+        case "triggerDisabled":
+          triggerMode = .triggerDisabled
+        case "triggerSystemStart":
+          triggerMode = .triggerSystemStart
+        case "triggerExerciseStart":
+          triggerMode = .triggerExerciseStart
+        default:
+          result(FlutterError(
+            code: PolarErrorCode.invalidArgument,
+            message: "Unknown trigger mode: \(triggerModeString)",
+            details: nil))
+          return
+        }
+      } else {
+        result(FlutterError(
+          code: PolarErrorCode.invalidArgument,
+          message: "triggerMode must be a string",
+          details: nil))
+        return
+      }
+      
+      // Convert trigger features
+      var triggerFeatures: [PolarDeviceDataType: PolarSensorSetting?] = [:]
+      for (dataTypeString, settingsValue) in triggerFeaturesDict {
+        let dataType: PolarDeviceDataType
+        switch dataTypeString {
+        case "ppi":
+          dataType = .ppi
+        case "hr":
+          dataType = .hr
+        case "ecg":
+          dataType = .ecg
+        case "acc":
+          dataType = .acc
+        case "ppg":
+          dataType = .ppg
+        case "gyro":
+          dataType = .gyro
+        case "magnetometer":
+          dataType = .magnetometer
+        case "temperature":
+          dataType = .temperature
+        case "pressure":
+          dataType = .pressure
+        default:
+          result(FlutterError(
+            code: PolarErrorCode.invalidArgument,
+            message: "Unknown data type: \(dataTypeString)",
+            details: nil))
+          return
+        }
+        
+        // For PPI and HR, settings should be nil
+        let settings: PolarSensorSetting?
+        if settingsValue != nil && dataType != .ppi && dataType != .hr {
+          // Parse settings if provided and not for PPI/HR
+          settings = nil // For now, we'll set this to nil since settings parsing is complex
+        } else {
+          settings = nil
+        }
+        
+        triggerFeatures[dataType] = settings
+      }
+      
+      let trigger = PolarOfflineRecordingTrigger(triggerMode: triggerMode, triggerFeatures: triggerFeatures)
+      
+      _ = api.setOfflineRecordingTrigger(identifier, trigger: trigger, secret: nil).subscribe(
+        onCompleted: {
+          result(nil)
+        },
+        onError: { error in
+          let errorCode = self.mapErrorCode(error)
+          result(FlutterError(
+            code: errorCode,
+            message: error.localizedDescription,
+            details: nil))
+        }
+      )
+    } catch {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Failed to parse trigger JSON: \(error.localizedDescription)",
+        details: nil))
+    }
+  }
+
+  func doRestart(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let api = api else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "API not initialized",
+        details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [Any],
+          let identifier = args[0] as? String,
+          let preservePairingInformation = args[1] as? Bool else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid arguments",
+        details: nil))
+      return
+    }
+    
+    _ = api.doRestart(identifier, preservePairingInformation: preservePairingInformation).subscribe(
+      onCompleted: {
+        result(nil)
+      },
+      onError: { error in
+        let errorCode = self.mapErrorCode(error)
+        result(FlutterError(
+          code: errorCode,
+          message: error.localizedDescription,
+          details: nil))
+      }
+    )
   }
 }
 

@@ -917,6 +917,81 @@ class Polar {
     }
   }
 
+  /// Sets the offline recording triggers for a given Polar device. The offline recording 
+  /// can be started automatically in the device by setting the triggers. The changes to 
+  /// the trigger settings will take effect on the next device startup.
+  ///
+  /// Automatically started offline recording can be stopped by stopOfflineRecording. 
+  /// Also if user switches off the device power, the offline recording is stopped but 
+  /// starts again once power is switched on and the trigger event happens.
+  ///
+  /// Trigger functionality can be disabled by setting PolarOfflineRecordingTriggerMode.triggerDisabled, 
+  /// the already running offline recording is not stopped by disable.
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address.
+  ///   - trigger: Type of trigger to set.
+  /// - Returns: Void.
+  ///   - success: The offline recording trigger was set successfully.
+  ///   - onError: The offline recording trigger was not set successfully; see PolarErrors for possible errors.
+  Future<void> setOfflineRecordingTrigger(
+    String identifier,
+    PolarOfflineRecordingTrigger trigger,
+  ) async {
+    try {
+      await _channel.invokeMethod(
+        'setOfflineRecordingTrigger',
+        [identifier, jsonEncode(trigger.toJson())],
+      );
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to set offline recording trigger: ${e.message}', e);
+      }
+    } catch (e) {
+      throw PolarDataException('Error setting offline recording trigger: $e');
+    }
+  }
+
+  /// Perform restart to given device.
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or UUID.
+  ///   - preservePairingInformation: Preserve pairing information during restart.
+  /// - Returns: Void.
+  ///   - success: When restart notification sent to device.
+  ///   - onError: See PolarErrors for possible errors invoked.
+  Future<void> doRestart(
+    String identifier, {
+    bool preservePairingInformation = true,
+  }) async {
+    try {
+      await _channel.invokeMethod(
+        'doRestart',
+        [identifier, preservePairingInformation],
+      );
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'device_disconnected':
+          throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
+        case 'not_supported':
+          throw PolarOperationNotSupportedException('Operation not supported by this device: ${e.message}', e);
+        case 'timeout':
+          throw PolarTimeoutException('Operation timed out: ${e.message}', e);
+        default:
+          throw PolarBluetoothOperationException('Failed to restart device: ${e.message}', e);
+      }
+    } catch (e) {
+      throw PolarDataException('Error restarting device: $e');
+    }
+  }
+
   /// Fetches the available and used disk space on a Polar device.
   ///
   /// - Parameters:

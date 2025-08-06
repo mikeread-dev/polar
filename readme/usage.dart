@@ -9,6 +9,45 @@ void example() {
   streamWhenReady();
 }
 
+/// Example: Set up automatic PPI recording on system start
+void setupAutomaticPpiRecording() async {
+  // Wait for device connection
+  await polar.deviceConnected.firstWhere((device) => device.deviceId == identifier);
+  
+  // Create a trigger for PPI recording on system start
+  final trigger = PolarOfflineRecordingTrigger.ppiOnSystemStart();
+  
+  try {
+    // Set the offline recording trigger
+    await polar.setOfflineRecordingTrigger(identifier, trigger);
+    debugPrint('Offline recording trigger set successfully');
+    
+    // Restart the device for the trigger to take effect
+    await polar.doRestart(identifier, preservePairingInformation: true);
+    debugPrint('Device restart initiated');
+  } catch (e) {
+    debugPrint('Error setting up automatic PPI recording: $e');
+  }
+}
+
+/// Example: Disable automatic recording
+void disableAutomaticRecording() async {
+  try {
+    // Create a disabled trigger
+    final trigger = PolarOfflineRecordingTrigger.disabled();
+    
+    // Set the trigger to disabled
+    await polar.setOfflineRecordingTrigger(identifier, trigger);
+    debugPrint('Automatic recording disabled');
+    
+    // Restart the device for the change to take effect
+    await polar.doRestart(identifier, preservePairingInformation: true);
+    debugPrint('Device restart initiated');
+  } catch (e) {
+    debugPrint('Error disabling automatic recording: $e');
+  }
+}
+
 void streamWhenReady() async {
   await polar.sdkFeatureReady.firstWhere(
     (e) =>

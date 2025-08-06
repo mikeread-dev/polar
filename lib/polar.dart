@@ -15,4 +15,6 @@ export 'src/model/polar_offline_record_entry.dart';
 export 'src/model/polar_offline_recording_data.dart';
 export 'src/model/polar_first_time_use_config.dart';
 export 'src/model/polar_sleep.dart';
+export 'src/model/polar_offline_recording_trigger_mode.dart';
+export 'src/model/polar_offline_recording_trigger.dart';
 export 'src/polar_version_compatibility.dart';
