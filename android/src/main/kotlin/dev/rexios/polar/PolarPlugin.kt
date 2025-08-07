@@ -33,6 +33,7 @@ import com.polar.sdk.api.model.PolarOfflineRecordingTrigger
 import com.polar.sdk.api.model.PolarOfflineRecordingTriggerMode
 import com.polar.sdk.api.model.PolarRecordingSecret
 import com.polar.sdk.api.model.sleep.PolarSleepData
+import com.polar.sdk.api.model.FirmwareUpdateStatus
 import com.polar.androidcommunications.api.ble.model.gatt.client.ChargeState
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -112,6 +113,9 @@ class PolarPlugin :
     // Search channel
     private lateinit var searchChannel: EventChannel
 
+    // Firmware update channel
+    private lateinit var firmwareUpdateChannel: EventChannel
+
     // Context
     private lateinit var context: Context
 
@@ -164,6 +168,9 @@ class PolarPlugin :
 
         searchChannel = EventChannel(flutterPluginBinding.binaryMessenger, "polar/search")
         searchChannel.setStreamHandler(searchHandler)
+        
+        firmwareUpdateChannel = EventChannel(flutterPluginBinding.binaryMessenger, "polar/firmware_update")
+        firmwareUpdateChannel.setStreamHandler(firmwareUpdateHandler)
 
         context = flutterPluginBinding.applicationContext
         
@@ -242,6 +249,7 @@ class PolarPlugin :
             "deleteStoredDeviceData" -> deleteStoredDeviceData(call, result)
             "setOfflineRecordingTrigger" -> setOfflineRecordingTrigger(call, result)
             "doRestart" -> doRestart(call, result)
+            "updateFirmware" -> updateFirmware(call, result)
             else -> result.notImplemented()
         }
     }
@@ -270,6 +278,24 @@ class PolarPlugin :
 
             override fun onCancel(arguments: Any?) {
                 searchSubscription?.dispose()
+            }
+        }
+
+    private var firmwareUpdateEvents: EventSink? = null
+    private var firmwareUpdateSubscription: Disposable? = null
+
+    private val firmwareUpdateHandler =
+        object : EventChannel.StreamHandler {
+            override fun onListen(
+                arguments: Any?,
+                events: EventSink,
+            ) {
+                firmwareUpdateEvents = events
+            }
+
+            override fun onCancel(arguments: Any?) {
+                firmwareUpdateSubscription?.dispose()
+                firmwareUpdateEvents = null
             }
         }
 
@@ -1482,6 +1508,59 @@ class PolarPlugin :
                 }
             })
             .discard()
+    }
+
+    private fun updateFirmware(call: MethodCall, result: Result) {
+        val arguments = call.arguments as List<*>
+        val identifier = arguments[0] as String
+        val firmwareUrl = arguments[1] as String
+
+        try {
+            initApi()
+            
+            firmwareUpdateSubscription = wrapper.api.updateFirmware(identifier, firmwareUrl)
+                .subscribe(
+                    { status ->
+                        runOnUiThread {
+                            val statusMap = mapOf(
+                                "status" to status.javaClass.simpleName,
+                                "details" to when (status) {
+                                    is FirmwareUpdateStatus.FetchingFwUpdatePackage -> status.details
+                                    is FirmwareUpdateStatus.PreparingDeviceForFwUpdate -> status.details
+                                    is FirmwareUpdateStatus.WritingFwUpdatePackage -> status.details
+                                    is FirmwareUpdateStatus.FinalizingFwUpdate -> status.details
+                                    is FirmwareUpdateStatus.FwUpdateCompletedSuccessfully -> status.details
+                                    is FirmwareUpdateStatus.FwUpdateNotAvailable -> status.details
+                                    is FirmwareUpdateStatus.FwUpdateFailed -> status.details
+                                    else -> "Unknown status"
+                                }
+                            )
+                            firmwareUpdateEvents?.success(statusMap)
+                        }
+                    },
+                    { error ->
+                        runOnUiThread {
+                            val errorCode = when {
+                                error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                                error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                                error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                                else -> PolarErrorCode.BLUETOOTH_ERROR
+                            }
+                            firmwareUpdateEvents?.error(errorCode, error.message, null)
+                        }
+                    },
+                    {
+                        runOnUiThread { 
+                            firmwareUpdateEvents?.endOfStream()
+                        }
+                    }
+                )
+            
+            // Return success immediately to indicate the update process has started
+            result.success(null)
+        } catch (e: Exception) {
+            result.error(PolarErrorCode.BLUETOOTH_ERROR, "Failed to start firmware update: ${e.message}", null)
+        }
     }
 }
 

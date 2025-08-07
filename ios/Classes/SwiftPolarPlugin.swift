@@ -56,6 +56,9 @@ public class SwiftPolarPlugin:
   /// Search channel
   let searchChannel: FlutterEventChannel
 
+  /// Firmware update channel
+  let firmwareUpdateChannel: FlutterEventChannel
+
   /// Streaming channels
   var streamingChannels = [String: StreamingChannel]()
 
@@ -67,26 +70,31 @@ public class SwiftPolarPlugin:
   init(
     messenger: FlutterBinaryMessenger,
     channel: FlutterMethodChannel,
-    searchChannel: FlutterEventChannel
+    searchChannel: FlutterEventChannel,
+    firmwareUpdateChannel: FlutterEventChannel
   ) {
     self.messenger = messenger
     self.channel = channel
     self.searchChannel = searchChannel
+    self.firmwareUpdateChannel = firmwareUpdateChannel
   }
 
   // Add the method back to conform to FlutterPlugin protocol
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "polar", binaryMessenger: registrar.messenger())
     let searchChannel = FlutterEventChannel(name: "polar/search", binaryMessenger: registrar.messenger())
+    let firmwareUpdateChannel = FlutterEventChannel(name: "polar/firmware_update", binaryMessenger: registrar.messenger())
     
     let instance = SwiftPolarPlugin(
         messenger: registrar.messenger(),
         channel: channel,
-        searchChannel: searchChannel
+        searchChannel: searchChannel,
+        firmwareUpdateChannel: firmwareUpdateChannel
     )
     
     registrar.addMethodCallDelegate(instance, channel: channel)
     searchChannel.setStreamHandler(instance.searchHandler)
+    firmwareUpdateChannel.setStreamHandler(instance.firmwareUpdateHandler)
   }
 
   private func initApi() {
@@ -182,6 +190,8 @@ public class SwiftPolarPlugin:
         setOfflineRecordingTrigger(call, result)
       case "doRestart":
         doRestart(call, result)
+      case "updateFirmware":
+        updateFirmware(call, result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -221,6 +231,20 @@ public class SwiftPolarPlugin:
     },
     onCancel: { _ in
       self.searchSubscription?.dispose()
+      return nil
+    })
+
+  var firmwareUpdateSubscription: Disposable?
+  var firmwareUpdateEvents: FlutterEventSink?
+  
+  lazy var firmwareUpdateHandler = StreamHandler(
+    onListen: { _, events in
+      self.firmwareUpdateEvents = events
+      return nil
+    },
+    onCancel: { _ in
+      self.firmwareUpdateSubscription?.dispose()
+      self.firmwareUpdateEvents = nil
       return nil
     })
 
@@ -1639,6 +1663,99 @@ public class SwiftPolarPlugin:
           details: nil))
       }
     )
+  }
+  
+  func updateFirmware(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let api = api else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "API not initialized",
+        details: nil))
+      return
+    }
+    
+    guard let args = call.arguments as? [Any],
+          let identifier = args[0] as? String,
+          let firmwareUrl = args[1] as? String else {
+      result(FlutterError(
+        code: PolarErrorCode.invalidArgument,
+        message: "Invalid arguments",
+        details: nil))
+      return
+    }
+    
+    // Start firmware update and stream events
+    let updateObservable: Observable<FirmwareUpdateStatus>
+    if firmwareUrl.isEmpty {
+      updateObservable = api.updateFirmware(identifier)
+    } else if let firmwareURL = URL(string: firmwareUrl) {
+      updateObservable = api.updateFirmware(identifier, fromFirmwareURL: firmwareURL)
+    } else {
+      updateObservable = Observable.error(NSError(domain: "PolarPlugin", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid firmware URL"]))
+    }
+    
+    firmwareUpdateSubscription = updateObservable.subscribe(
+      onNext: { [weak self] status in
+        guard let self = self else { return }
+        
+        let statusString: String
+        let details: String
+        
+        switch status {
+        case .fetchingFwUpdatePackage(let statusDetails):
+          statusString = "fetchingFwUpdatePackage"
+          details = statusDetails
+        case .preparingDeviceForFwUpdate(let statusDetails):
+          statusString = "preparingDeviceForFwUpdate"
+          details = statusDetails
+        case .writingFwUpdatePackage(let statusDetails):
+          statusString = "writingFwUpdatePackage"
+          details = statusDetails
+        case .finalizingFwUpdate(let statusDetails):
+          statusString = "finalizingFwUpdate"
+          details = statusDetails
+        case .fwUpdateCompletedSuccessfully(let statusDetails):
+          statusString = "fwUpdateCompletedSuccessfully"
+          details = statusDetails
+        case .fwUpdateNotAvailable(let statusDetails):
+          statusString = "fwUpdateNotAvailable"
+          details = statusDetails
+        case .fwUpdateFailed(let statusDetails):
+          statusString = "fwUpdateFailed"
+          details = statusDetails
+        }
+        
+        let statusMap: [String: Any] = [
+          "status": statusString,
+          "details": details
+        ]
+        
+        DispatchQueue.main.async {
+          self.firmwareUpdateEvents?(statusMap)
+        }
+      },
+      onError: { [weak self] error in
+        guard let self = self else { return }
+        
+        let errorCode = self.mapErrorCode(error)
+        DispatchQueue.main.async {
+          self.firmwareUpdateEvents?(FlutterError(
+            code: errorCode,
+            message: error.localizedDescription,
+            details: nil))
+        }
+      },
+      onCompleted: { [weak self] in
+        guard let self = self else { return }
+        
+        DispatchQueue.main.async {
+          self.firmwareUpdateEvents?(FlutterEndOfEventStream)
+        }
+      }
+    )
+    
+    // Return success immediately to indicate the update process has started
+    result(nil)
   }
 }
 

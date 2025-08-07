@@ -960,6 +960,49 @@ class Polar {
   }
 
   /// Perform restart to given device.
+  
+  /// Update firmware on the device
+  ///
+  /// - Parameters:
+  ///   - identifier: Polar device id or address.
+  ///   - firmwareUrl: Optional URL to specific firmware version. If empty, gets latest version.
+  /// - Returns: Stream of firmware update status events
+  ///   - onData: FirmwareUpdateEvent with status and details
+  ///   - onError: See PolarErrors for possible errors invoked
+  Stream<PolarFirmwareUpdateEvent> updateFirmware(String identifier, {String? firmwareUrl}) {
+    try {
+      // Start the firmware update via method channel
+      _channel.invokeMethod('updateFirmware', [identifier, firmwareUrl ?? '']);
+      
+      // Listen to the firmware update events via event channel
+      const eventChannel = EventChannel('polar/firmware_update');
+      return eventChannel.receiveBroadcastStream().map((event) {
+        final eventMap = Map<String, dynamic>.from(event as Map);
+        return PolarFirmwareUpdateEvent.fromJson(eventMap);
+      }).handleError((error) {
+        if (error is PlatformException) {
+          switch (error.code) {
+            case 'device_disconnected':
+              throw PolarDeviceDisconnectedException('Device $identifier is not connected', error);
+            case 'not_supported':
+              throw PolarOperationNotSupportedException('Firmware update not supported for device $identifier', error);
+            case 'timeout':
+              throw PolarDataException('Firmware update timed out for device $identifier: ${error.message}', error);
+            case 'invalid_argument':
+              throw PolarInvalidArgumentException('Invalid argument for firmware update: ${error.message}', error);
+            case 'bluetooth_error':
+              throw PolarDataException('Bluetooth error during firmware update: ${error.message}', error);
+            default:
+              throw PolarDataException('Firmware update failed: ${error.message}', error);
+          }
+        }
+        throw PolarDataException('Firmware update failed: $error');
+      });
+    } catch (e) {
+      throw PolarDataException('Failed to start firmware update: $e');
+    }
+  }
+
   ///
   /// - Parameters:
   ///   - identifier: Polar device id or UUID.
