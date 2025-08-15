@@ -26,4 +26,13 @@ class PolarConfig {
 }
 
 /// Available logging levels for the Polar SDK
-enum LogLevel { debug, info, warning, error }
+enum LogLevel { 
+  /// Debug level logging - most verbose
+  debug, 
+  /// Info level logging - general information
+  info, 
+  /// Warning level logging - potential issues
+  warning, 
+  /// Error level logging - errors only
+  error 
+}

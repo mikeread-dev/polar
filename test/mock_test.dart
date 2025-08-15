@@ -1,12 +1,9 @@
-// ignore_for_file: require_trailing_commas
-
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:polar/polar.dart';
-import 'package:polar/src/model/polar_offline_recording_data.dart';
 import 'package:flutter/foundation.dart';
 import 'tests.dart';
 
@@ -185,9 +182,9 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
                 'timeStamp': now.millisecondsSinceEpoch,
                 'x': 1,
                 'y': 1,
-                'z': 1
+                'z': 1,
               },
-            ]
+            ],
           },
           'startTime': {
             'year': now.year,
@@ -198,8 +195,8 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
             'second': now.second,
           },
           'settings': {
-            'settings': {}
-          }
+            'settings': {},
+          },
         };
         return jsonEncode(accData);
       } else if (entry.type == PolarDataType.ppi) {
@@ -229,10 +226,10 @@ Future<dynamic> handleMethodCall(MethodCall methodCall) async {
               {
                 'startTime': now.subtract(const Duration(hours: 8)).toIso8601String(),
                 'endTime': now.subtract(const Duration(hours: 7)).toIso8601String(),
-                'sleepStage': 'DEEP_SLEEP'
+                'sleepStage': 'DEEP_SLEEP',
               }
-            ]
-          }
+            ],
+          },
         }
       ];
     default:

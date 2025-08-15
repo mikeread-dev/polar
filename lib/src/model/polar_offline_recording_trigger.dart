@@ -62,7 +62,7 @@ Map<String, dynamic> _triggerFeaturesToJson(Map<PolarDataType, PolarSensorSettin
   return triggerFeatures.map((key, value) => MapEntry(
     key.name, // Convert enum to string
     value?.toJson(), // Convert PolarSensorSetting to JSON or null
-  ));
+  ),);
 }
 
 /// Helper function to convert JSON to triggerFeatures map
