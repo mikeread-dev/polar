@@ -554,6 +554,9 @@ class PolarOfflineRecordingDataCodable: Encodable {
             let skinTemperatureDataCodable = PolarDataCodable(skinTemperatureData)
             try container.encode(skinTemperatureDataCodable, forKey: .data)
             try container.encode(startTime.millisecondsSince1970, forKey: .startTime)
+        @unknown default:
+            // Handle any new cases added in future SDK versions
+            try container.encode("unknownOfflineRecordingData", forKey: .type)
         }
     }
 }

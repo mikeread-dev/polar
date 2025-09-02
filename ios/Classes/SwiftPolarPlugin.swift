@@ -1347,6 +1347,9 @@ public class SwiftPolarPlugin:
             return PolarErrorCode.invalidArgument
         case .polarBleSdkInternalException, .deviceError, .polarOfflineRecordingError:
             return PolarErrorCode.bluetoothError
+        @unknown default:
+            // Handle any new error cases added in future SDK versions
+            return PolarErrorCode.bluetoothError
         }
     }
     
