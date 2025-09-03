@@ -1190,23 +1190,128 @@ class PolarPlugin :
 
     private fun getSleepRecordingState(call: MethodCall, result: Result) {
         val identifier = call.arguments as String
+        val startTime = System.currentTimeMillis()
         println("[PolarPlugin] getSleepRecordingState called for device $identifier")
+        
+        // Add manual timeout mechanism since the observable might hang after device charging
+        var isCompleted = false
+        val timeoutHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        val timeoutRunnable = Runnable {
+            if (!isCompleted) {
+                isCompleted = true
+                val elapsed = System.currentTimeMillis() - startTime
+                println("[PolarPlugin] getSleepRecordingState timed out after ${elapsed}ms - SDK hanging, attempting auto-recovery")
+                
+                // Auto-recovery: restart device and retry
+                wrapper.api
+                    .doRestart(identifier)
+                    .subscribe({
+                        println("[PolarPlugin] Device restart successful, retrying getSleepRecordingState...")
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            getSleepRecordingStateWithRetry(identifier, result, 1)
+                        }, 3000) // Wait 3 seconds after restart
+                    }, { error ->
+                        println("[PolarPlugin] Device restart failed: ${error.message}")
+                        runOnUiThread {
+                            try {
+                                result.error(PolarErrorCode.TIMEOUT, 
+                                    "getSleepRecordingState hung and restart failed: ${error.message}", 
+                                    mapOf("errorType" to "HangingWithFailedRestart", "deviceId" to identifier))
+                            } catch (e: Exception) {
+                                println("[PolarPlugin] Result already handled: ${e.message}")
+                            }
+                        }
+                    })
+                    .discard()
+            }
+        }
+        
+        // Set 20 second timeout with auto-recovery
+        timeoutHandler.postDelayed(timeoutRunnable, 20000)
         
         wrapper.api
             .getSleepRecordingState(identifier)
             .subscribe({ isRecording ->
-                println("[PolarPlugin] getSleepRecordingState result: $isRecording")
-                runOnUiThread { result.success(isRecording) }
-            }, { error ->
-                println("[PolarPlugin] Error getting sleep recording state: ${error.message}")
-                runOnUiThread {
-                    val errorCode = when {
-                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
-                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
-                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
-                        else -> PolarErrorCode.BLUETOOTH_ERROR
+                if (!isCompleted) {
+                    isCompleted = true
+                    timeoutHandler.removeCallbacks(timeoutRunnable)
+                    val elapsed = System.currentTimeMillis() - startTime
+                    println("[PolarPlugin] getSleepRecordingState SUCCESS after ${elapsed}ms: $isRecording")
+                    runOnUiThread { 
+                        try {
+                            result.success(isRecording)
+                        } catch (e: Exception) {
+                            println("[PolarPlugin] Result already handled: ${e.message}")
+                        }
                     }
-                    result.error(errorCode, error.message, null)
+                }
+            }, { error ->
+                if (!isCompleted) {
+                    isCompleted = true
+                    timeoutHandler.removeCallbacks(timeoutRunnable)
+                    val elapsed = System.currentTimeMillis() - startTime
+                    println("[PolarPlugin] getSleepRecordingState ERROR after ${elapsed}ms: ${error.message}")
+                    
+                    runOnUiThread {
+                        try {
+                            val errorCode = when {
+                                error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                                error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                                error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                                else -> PolarErrorCode.BLUETOOTH_ERROR
+                            }
+                            result.error(errorCode, "getSleepRecordingState failed: ${error.message}", 
+                                mapOf("deviceId" to identifier, "elapsed" to elapsed))
+                        } catch (e: Exception) {
+                            println("[PolarPlugin] Result already handled: ${e.message}")
+                        }
+                    }
+                }
+            })
+            .discard()
+    }
+
+
+    // Helper method to retry getSleepRecordingState with exponential backoff
+    private fun getSleepRecordingStateWithRetry(identifier: String, result: Result, attempt: Int) {
+        val maxAttempts = 3
+        val backoffMs = 2000L * attempt // 2s, 4s, 6s
+        
+        println("[PolarPlugin] getSleepRecordingStateWithRetry attempt $attempt/$maxAttempts for device $identifier")
+        
+        wrapper.api
+            .getSleepRecordingState(identifier)
+            .doOnError { error -> 
+                println("[PolarPlugin] Recovery attempt $attempt error: ${error.javaClass.simpleName} - ${error.message}")
+            }
+            .subscribe({ isRecording ->
+                println("[PolarPlugin] Recovery successful on attempt $attempt: $isRecording")
+                runOnUiThread {
+                    try {
+                        result.success(isRecording)
+                    } catch (e: Exception) {
+                        println("[PolarPlugin] Result already handled in recovery: ${e.message}")
+                    }
+                }
+            }, { error ->
+                println("[PolarPlugin] Recovery attempt $attempt failed: ${error.message}")
+                
+                if (attempt < maxAttempts) {
+                    println("[PolarPlugin] Retrying in ${backoffMs}ms (attempt ${attempt + 1}/$maxAttempts)")
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        getSleepRecordingStateWithRetry(identifier, result, attempt + 1)
+                    }, backoffMs)
+                } else {
+                    println("[PolarPlugin] All recovery attempts failed")
+                    runOnUiThread {
+                        try {
+                            result.error(PolarErrorCode.BLUETOOTH_ERROR, 
+                                "Recovery failed after $maxAttempts attempts: ${error.message}", 
+                                mapOf("recoveryAttempts" to maxAttempts, "finalError" to error.message))
+                        } catch (e: Exception) {
+                            println("[PolarPlugin] Result already handled in recovery error: ${e.message}")
+                        }
+                    }
                 }
             })
             .discard()
