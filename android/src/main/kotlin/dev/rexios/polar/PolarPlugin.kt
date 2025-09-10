@@ -1190,71 +1190,27 @@ class PolarPlugin :
 
     private fun getSleepRecordingState(call: MethodCall, result: Result) {
         val identifier = call.arguments as String
-        val startTime = System.currentTimeMillis()
         println("[PolarPlugin] getSleepRecordingState called for device $identifier")
-        
-        // Add manual timeout mechanism since the observable might hang after device charging
-        var isCompleted = false
-        val timeoutMs = 2000L // Set short 2 second timeout - getSleepRecordingState should respond quickly
-        val timeoutHandler = android.os.Handler(android.os.Looper.getMainLooper())
-        val timeoutRunnable = Runnable {
-            if (!isCompleted) {
-                isCompleted = true
-                val elapsed = System.currentTimeMillis() - startTime
-                println("[PolarPlugin] getSleepRecordingState timed out after ${elapsed}ms")
-                
-                // Simple timeout error - no auto-recovery
-                runOnUiThread {
-                    try {
-                        result.error(PolarErrorCode.TIMEOUT, 
-                            "getSleepRecordingState timed out after ${timeoutMs}ms", 
-                            mapOf("timeout" to timeoutMs, "deviceId" to identifier))
-                    } catch (e: Exception) {
-                        println("[PolarPlugin] Result already handled: ${e.message}")
-                    }
-                }
-            }
-        }
-        println("[PolarPlugin] Setting getSleepRecordingState timeout to ${timeoutMs}ms")
-        timeoutHandler.postDelayed(timeoutRunnable, timeoutMs)
         
         wrapper.api
             .getSleepRecordingState(identifier)
             .subscribe({ isRecording ->
-                if (!isCompleted) {
-                    isCompleted = true
-                    timeoutHandler.removeCallbacks(timeoutRunnable)
-                    val elapsed = System.currentTimeMillis() - startTime
-                    println("[PolarPlugin] getSleepRecordingState SUCCESS after ${elapsed}ms: $isRecording")
-                    runOnUiThread { 
-                        try {
-                            result.success(isRecording)
-                        } catch (e: Exception) {
-                            println("[PolarPlugin] Result already handled: ${e.message}")
-                        }
-                    }
+                println("[PolarPlugin] getSleepRecordingState SUCCESS: $isRecording")
+                runOnUiThread { 
+                    result.success(isRecording)
                 }
             }, { error ->
-                if (!isCompleted) {
-                    isCompleted = true
-                    timeoutHandler.removeCallbacks(timeoutRunnable)
-                    val elapsed = System.currentTimeMillis() - startTime
-                    println("[PolarPlugin] getSleepRecordingState ERROR after ${elapsed}ms: ${error.message}")
-                    
-                    runOnUiThread {
-                        try {
-                            val errorCode = when {
-                                error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
-                                error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
-                                error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
-                                else -> PolarErrorCode.BLUETOOTH_ERROR
-                            }
-                            result.error(errorCode, "getSleepRecordingState failed: ${error.message}", 
-                                mapOf("deviceId" to identifier, "elapsed" to elapsed))
-                        } catch (e: Exception) {
-                            println("[PolarPlugin] Result already handled: ${e.message}")
-                        }
+                println("[PolarPlugin] getSleepRecordingState ERROR: ${error.message}")
+                
+                runOnUiThread {
+                    val errorCode = when {
+                        error is PolarDeviceDisconnected -> PolarErrorCode.DEVICE_DISCONNECTED
+                        error is PolarOperationNotSupported -> PolarErrorCode.NOT_SUPPORTED
+                        error.message?.contains("timeout", ignoreCase = true) == true -> PolarErrorCode.TIMEOUT
+                        else -> PolarErrorCode.BLUETOOTH_ERROR
                     }
+                    result.error(errorCode, "getSleepRecordingState failed: ${error.message}", 
+                        mapOf("deviceId" to identifier))
                 }
             })
             .discard()
