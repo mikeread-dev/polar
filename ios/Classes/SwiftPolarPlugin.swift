@@ -1668,6 +1668,7 @@ public class SwiftPolarPlugin:
     )
   }
   
+  
   func updateFirmware(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
     guard let api = api else {
       result(FlutterError(

@@ -1516,6 +1516,7 @@ class PolarPlugin :
             .discard()
     }
 
+
     private fun updateFirmware(call: MethodCall, result: Result) {
         val arguments = call.arguments as List<*>
         val identifier = arguments[0] as String

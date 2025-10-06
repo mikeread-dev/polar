@@ -959,6 +959,7 @@ class Polar {
     }
   }
 
+
   /// Perform restart to given device.
   
   /// Update firmware on the device
