@@ -34,7 +34,9 @@ import com.polar.sdk.api.model.PolarOfflineRecordingTriggerMode
 import com.polar.sdk.api.model.PolarRecordingSecret
 import com.polar.sdk.api.model.sleep.PolarSleepData
 import com.polar.sdk.api.model.FirmwareUpdateStatus
+import com.polar.sdk.api.model.*
 import com.polar.androidcommunications.api.ble.model.gatt.client.ChargeState
+import com.polar.androidcommunications.api.ble.model.gatt.client.PowerSourcesState
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -1722,6 +1724,15 @@ class PolarWrapper @OptIn(ExperimentalStdlibApi::class) constructor(
         features: Set<PolarDeviceDataType>,
     ) {
         // Do nothing
+    }
+
+    override fun powerSourcesStateReceived(
+        identifier: String,
+        powerSourcesState: PowerSourcesState,
+    ) {
+        // TODO: Implement this if needed
+        // For now, we're just providing a stub implementation
+        invoke("powerSourcesStateReceived", listOf(identifier, gson.toJson(powerSourcesState)))
     }
 }
 
