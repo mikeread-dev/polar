@@ -192,6 +192,10 @@ public class SwiftPolarPlugin:
         doRestart(call, result)
       case "updateFirmware":
         updateFirmware(call, result)
+      case "getBluetoothBondingState":
+        getBluetoothBondingState(call, result)
+      case "openBluetoothSettings":
+        openBluetoothSettings(result)
       default: result(FlutterMethodNotImplemented)
       }
     } catch {
@@ -1791,6 +1795,50 @@ extension SwiftPolarPlugin {
   @objc internal func usbStatusReceived(_ identifier: String, status: Bool) {
     // Default empty implementation for USB status
     invokeMethod("usbStatusReceived", arguments: [identifier, status])
+  }
+  
+  // MARK: - Android compatibility methods
+  
+  /// Check Bluetooth bonding state (iOS always returns not bonded since iOS doesn't use bonding like Android)
+  func getBluetoothBondingState(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    // iOS doesn't have the same Bluetooth bonding concept as Android
+    // iOS uses a different pairing mechanism that is handled by the system automatically
+    // Return a response indicating that bonding state is not applicable on iOS
+    result([
+      "isBonded": false,
+      "bondState": "NOT_APPLICABLE_IOS",
+      "error": "Bonding state check is not applicable on iOS. iOS handles Bluetooth pairing automatically."
+    ])
+  }
+  
+  /// Open Bluetooth settings (iOS can open app-level Settings)
+  func openBluetoothSettings(_ result: @escaping FlutterResult) {
+    // iOS can only open the app's settings page, not directly to Bluetooth settings
+    // This is a limitation of iOS - apps cannot directly open system Bluetooth settings
+    if let url = URL(string: UIApplication.openSettingsURLString) {
+      if UIApplication.shared.canOpenURL(url) {
+        UIApplication.shared.open(url, options: [:]) { success in
+          if success {
+            result(true)
+          } else {
+            result(FlutterError(
+              code: PolarErrorCode.bluetoothError,
+              message: "Failed to open Settings",
+              details: nil))
+          }
+        }
+      } else {
+        result(FlutterError(
+          code: PolarErrorCode.bluetoothError,
+          message: "Cannot open Settings on this device",
+          details: nil))
+      }
+    } else {
+      result(FlutterError(
+        code: PolarErrorCode.bluetoothError,
+        message: "Settings URL not available",
+        details: nil))
+    }
   }
 }
 

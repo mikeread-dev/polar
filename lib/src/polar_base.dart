@@ -1148,6 +1148,62 @@ class Polar {
     }
   }
 
+  /// Check the Bluetooth bonding/pairing state for a device
+  /// 
+  /// Returns a map with bonding information:
+  /// - isBonded: true if device is bonded/paired
+  /// - bondState: "BOND_NONE", "BOND_BONDING", or "BOND_BONDED"
+  /// - deviceName: name of the device (if bonded)
+  /// - deviceAddress: MAC address of the device (if bonded)
+  /// - error: error message (if any)
+  Future<Map<String, dynamic>> getBluetoothBondingState(String identifier) async {
+    try {
+      final result = await _channel.invokeMethod('getBluetoothBondingState', identifier);
+      
+      if (result is Map) {
+        return Map<String, dynamic>.from(result);
+      }
+      
+      return {
+        'isBonded': false,
+        'bondState': 'UNKNOWN',
+        'error': 'Invalid response from platform'
+      };
+    } on PlatformException catch (e) {
+      debugPrint('[Polar] Error checking bonding state: ${e.message}');
+      return {
+        'isBonded': false,
+        'bondState': 'UNKNOWN',
+        'error': e.message ?? 'Unknown error'
+      };
+    } catch (e) {
+      debugPrint('[Polar] Unexpected error checking bonding state: $e');
+      return {
+        'isBonded': false,
+        'bondState': 'UNKNOWN',
+        'error': e.toString()
+      };
+    }
+  }
+
+  /// Open Android Bluetooth settings
+  /// 
+  /// Returns true if settings were opened successfully
+  /// Throws PlatformException if opening settings fails
+  Future<bool> openBluetoothSettings() async {
+    try {
+      final result = await _channel.invokeMethod('openBluetoothSettings');
+      debugPrint('[Polar] Bluetooth settings opened successfully');
+      return result == true;
+    } on PlatformException catch (e) {
+      debugPrint('[Polar] Error opening Bluetooth settings: ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('[Polar] Unexpected error opening Bluetooth settings: $e');
+      rethrow;
+    }
+  }
+
   /// Get sleep data for a specific date range
   /// 
   /// Returns an empty list if no sleep data is available for the specified date range

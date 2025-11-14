@@ -1,6 +1,11 @@
 package dev.rexios.polar
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.os.Handler
 import android.os.Looper
 import androidx.lifecycle.Lifecycle.Event
@@ -120,6 +125,9 @@ class PolarPlugin :
 
     // Context
     private lateinit var context: Context
+    
+    // Activity context for starting intents
+    private var activity: android.app.Activity? = null
 
     // Streaming channels
     private val streamingChannels = mutableMapOf<String, StreamingChannel>()
@@ -252,6 +260,8 @@ class PolarPlugin :
             "setOfflineRecordingTrigger" -> setOfflineRecordingTrigger(call, result)
             "doRestart" -> doRestart(call, result)
             "updateFirmware" -> updateFirmware(call, result)
+            "getBluetoothBondingState" -> getBluetoothBondingState(call, result)
+            "openBluetoothSettings" -> openBluetoothSettings(result)
             else -> result.notImplemented()
         }
     }
@@ -319,6 +329,7 @@ class PolarPlugin :
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
         val lifecycle = FlutterLifecycleAdapter.getActivityLifecycle(binding)
         lifecycle.addObserver(
             LifecycleEventObserver { _, event ->
@@ -331,11 +342,17 @@ class PolarPlugin :
         )
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {}
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
 
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {}
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+    }
 
-    override fun onDetachedFromActivity() {}
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
 
     private fun shutDown() {
         if (wrapperInternal == null) return
@@ -1569,6 +1586,114 @@ class PolarPlugin :
             result.success(null)
         } catch (e: Exception) {
             result.error(PolarErrorCode.BLUETOOTH_ERROR, "Failed to start firmware update: ${e.message}", null)
+        }
+    }
+
+    private fun getBluetoothBondingState(call: MethodCall, result: Result) {
+        try {
+            val identifier = call.arguments as? String ?: run {
+                result.error(
+                    PolarErrorCode.INVALID_ARGUMENT,
+                    "Device identifier is required",
+                    null
+                )
+                return
+            }
+
+            println("[PolarPlugin] Checking Bluetooth bonding state for device: $identifier")
+
+            val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val bluetoothAdapter = bluetoothManager?.adapter
+
+            if (bluetoothAdapter == null) {
+                println("[PolarPlugin] Bluetooth adapter not available")
+                result.success(mapOf(
+                    "isBonded" to false,
+                    "bondState" to "BOND_NONE",
+                    "error" to "Bluetooth not available"
+                ))
+                return
+            }
+
+            // Get bonded devices
+            val bondedDevices = try {
+                bluetoothAdapter.bondedDevices
+            } catch (e: SecurityException) {
+                println("[PolarPlugin] Security exception getting bonded devices: ${e.message}")
+                result.success(mapOf(
+                    "isBonded" to false,
+                    "bondState" to "UNKNOWN",
+                    "error" to "Permission denied"
+                ))
+                return
+            }
+
+            // Look for the device in bonded devices
+            val device = bondedDevices?.find { it.address == identifier }
+
+            if (device != null) {
+                val bondStateString = when (device.bondState) {
+                    BluetoothDevice.BOND_NONE -> "BOND_NONE"
+                    BluetoothDevice.BOND_BONDING -> "BOND_BONDING"
+                    BluetoothDevice.BOND_BONDED -> "BOND_BONDED"
+                    else -> "UNKNOWN"
+                }
+
+                println("[PolarPlugin] Device $identifier bond state: $bondStateString")
+
+                result.success(mapOf(
+                    "isBonded" to (device.bondState == BluetoothDevice.BOND_BONDED),
+                    "bondState" to bondStateString,
+                    "deviceName" to (device.name ?: "Unknown"),
+                    "deviceAddress" to device.address
+                ))
+            } else {
+                println("[PolarPlugin] Device $identifier not found in bonded devices")
+                result.success(mapOf(
+                    "isBonded" to false,
+                    "bondState" to "BOND_NONE"
+                ))
+            }
+        } catch (e: Exception) {
+            println("[PolarPlugin] Error checking bonding state: ${e.message}")
+            e.printStackTrace()
+            result.error(
+                PolarErrorCode.BLUETOOTH_ERROR,
+                "Failed to check bonding state: ${e.message}",
+                null
+            )
+        }
+    }
+
+    private fun openBluetoothSettings(result: Result) {
+        try {
+            println("[PolarPlugin] Opening Bluetooth settings...")
+            
+            val currentActivity = activity
+            if (currentActivity == null) {
+                println("[PolarPlugin] Activity not available")
+                result.error(
+                    PolarErrorCode.BLUETOOTH_ERROR,
+                    "Activity not available to open settings",
+                    null
+                )
+                return
+            }
+            
+            val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+            // Don't use FLAG_ACTIVITY_NEW_TASK - use the current activity's task
+            currentActivity.startActivity(intent)
+            
+            println("[PolarPlugin] Bluetooth settings opened successfully")
+            result.success(true)
+        } catch (e: Exception) {
+            println("[PolarPlugin] Error opening Bluetooth settings: ${e.message}")
+            e.printStackTrace()
+            result.error(
+                PolarErrorCode.BLUETOOTH_ERROR,
+                "Failed to open Bluetooth settings: ${e.message}",
+                null
+            )
         }
     }
 }
