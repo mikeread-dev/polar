@@ -21,6 +21,19 @@ private func jsonEncode(_ value: Encodable) -> String? {
   return data
 }
 
+// Helper function to convert DateComponents to String
+private func dateComponentsToString(_ dateComponents: DateComponents?) -> String {
+  guard let components = dateComponents else {
+    return ""
+  }
+  
+  let year = components.year ?? 0
+  let month = components.month ?? 0
+  let day = components.day ?? 0
+  
+  return String(format: "%04d-%02d-%02d", year, month, day)
+}
+
 // Remove our custom enum and use the real PolarBleSdk errors instead
 // These are the commonly used error types from PolarBleSdk
 
@@ -1128,7 +1141,7 @@ public class SwiftPolarPlugin:
             // Enhanced debugging for each sleep result
             for (index, sleepResult) in sleepAnalysisResults.enumerated() {
                 print("[PolarPlugin] === Sleep Record \(index + 1) Details ===")
-                print("[PolarPlugin] sleepResultDate: \(sleepResult.sleepResultDate ?? "nil")")
+                print("[PolarPlugin] sleepResultDate: \(dateComponentsToString(sleepResult.sleepResultDate))")
                 print("[PolarPlugin] sleepStartTime: \(sleepResult.sleepStartTime?.description ?? "nil")")
                 print("[PolarPlugin] sleepEndTime: \(sleepResult.sleepEndTime?.description ?? "nil")")
                 print("[PolarPlugin] lastModified: \(sleepResult.lastModified?.description ?? "nil")")
@@ -1154,7 +1167,7 @@ public class SwiftPolarPlugin:
                 // Wrap each sleep analysis result in the expected PolarSleepData structure
                 let wrappedSleepData = sleepAnalysisResults.map { analysisResult in
                     return PolarSleepDataWrapper(
-                        date: analysisResult.sleepResultDate ?? "",
+                        date: dateComponentsToString(analysisResult.sleepResultDate),
                         result: analysisResult
                     )
                 }
