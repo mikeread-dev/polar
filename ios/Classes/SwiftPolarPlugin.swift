@@ -47,9 +47,74 @@ private enum PolarErrorCode {
 }
 
 // Wrapper structure to match Flutter's expected PolarSleepData format
+// ✅ FIX: Manually convert all Date objects to ISO8601 strings to avoid Map encoding
 private struct PolarSleepDataWrapper: Encodable {
     let date: String
-    let result: PolarSleepData.PolarSleepAnalysisResult
+    let result: SleepAnalysisResultWrapper
+    
+    init(date: String, result: PolarSleepData.PolarSleepAnalysisResult) {
+        self.date = date
+        self.result = SleepAnalysisResultWrapper(from: result)
+    }
+}
+
+// Manual wrapper to convert all Date objects to strings
+private struct SleepAnalysisResultWrapper: Encodable {
+    let batteryRanOut: Bool?
+    let deviceId: String?
+    let lastModified: String?
+    let sleepCycles: [SleepCycleWrapper]?
+    let sleepEndOffsetSeconds: Int?
+    let sleepEndTime: String?
+    let sleepGoalMinutes: Int?
+    let sleepResultDate: String?
+    let sleepStartOffsetSeconds: Int?
+    let sleepStartTime: String?
+    let sleepWakePhases: [SleepWakePhaseWrapper]?
+    
+    init(from result: PolarSleepData.PolarSleepAnalysisResult) {
+        let iso8601 = ISO8601DateFormatter()
+        iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        self.batteryRanOut = result.batteryRanOut
+        self.deviceId = result.deviceId
+        self.lastModified = result.lastModified.map { iso8601.string(from: $0) }
+        self.sleepCycles = result.sleepCycles?.map { SleepCycleWrapper(from: $0) }
+        // Handle Int32 -> Int conversion
+        self.sleepEndOffsetSeconds = result.sleepEndOffsetSeconds.map { Int($0) }
+        self.sleepEndTime = result.sleepEndTime.map { iso8601.string(from: $0) }
+        // Handle UInt32 -> Int conversion
+        self.sleepGoalMinutes = result.sleepGoalMinutes.map { Int($0) }
+        self.sleepResultDate = result.sleepResultDate.map { dateComponentsToString($0) }
+        // Handle Int32 -> Int conversion
+        self.sleepStartOffsetSeconds = result.sleepStartOffsetSeconds.map { Int($0) }
+        self.sleepStartTime = result.sleepStartTime.map { iso8601.string(from: $0) }
+        self.sleepWakePhases = result.sleepWakePhases?.map { SleepWakePhaseWrapper(from: $0) }
+    }
+}
+
+private struct SleepCycleWrapper: Encodable {
+    let secondsFromSleepStart: Int
+    let sleepDepthStart: Double
+    
+    init(from cycle: PolarSleepData.SleepCycle) {
+        // Handle Int32 -> Int conversion
+        self.secondsFromSleepStart = Int(cycle.secondsFromSleepStart)
+        // Handle Float -> Double conversion
+        self.sleepDepthStart = Double(cycle.sleepDepthStart)
+    }
+}
+
+private struct SleepWakePhaseWrapper: Encodable {
+    let secondsFromSleepStart: Int
+    let state: String
+    
+    init(from phase: PolarSleepData.SleepWakePhase) {
+        // Handle Int32 -> Int conversion
+        self.secondsFromSleepStart = Int(phase.secondsFromSleepStart)
+        // Use rawValue to get the String representation of the enum (matches Android's .name)
+        self.state = phase.state.rawValue
+    }
 }
 
 public class SwiftPolarPlugin:
@@ -1129,42 +1194,24 @@ public class SwiftPolarPlugin:
         return
     }
     
-    // For debugging
     print("[PolarPlugin] getSleep called with fromDate=\(fromDateStr), toDate=\(toDateStr)")
-    print("[PolarPlugin] Parsed dates - fromDate=\(fromDate), toDate=\(toDate)")
     
     // Use the correct iOS API method getSleepData
     _ = api.getSleepData(identifier: identifier, fromDate: fromDate, toDate: toDate).subscribe(
         onSuccess: { sleepAnalysisResults in
             print("[PolarPlugin] getSleepData received \(sleepAnalysisResults.count) sleep analysis results")
             
-            // Enhanced debugging for each sleep result
-            for (index, sleepResult) in sleepAnalysisResults.enumerated() {
-                print("[PolarPlugin] === Sleep Record \(index + 1) Details ===")
-                print("[PolarPlugin] sleepResultDate: \(dateComponentsToString(sleepResult.sleepResultDate))")
-                print("[PolarPlugin] sleepStartTime: \(sleepResult.sleepStartTime?.description ?? "nil")")
-                print("[PolarPlugin] sleepEndTime: \(sleepResult.sleepEndTime?.description ?? "nil")")
-                print("[PolarPlugin] lastModified: \(sleepResult.lastModified?.description ?? "nil")")
-                print("[PolarPlugin] sleepGoalMinutes: \(sleepResult.sleepGoalMinutes?.description ?? "nil")")
-                print("[PolarPlugin] deviceId: \(sleepResult.deviceId ?? "nil")")
-                print("[PolarPlugin] userSleepRating: \(sleepResult.userSleepRating?.rawValue.description ?? "nil")")
-                print("[PolarPlugin] batteryRanOut: \(sleepResult.batteryRanOut?.description ?? "nil")")
-                print("[PolarPlugin] sleepStartOffsetSeconds: \(sleepResult.sleepStartOffsetSeconds?.description ?? "nil")")
-                print("[PolarPlugin] sleepEndOffsetSeconds: \(sleepResult.sleepEndOffsetSeconds?.description ?? "nil")")
-                print("[PolarPlugin] sleepWakePhases count: \(sleepResult.sleepWakePhases?.count ?? 0)")
-                print("[PolarPlugin] sleepCycles count: \(sleepResult.sleepCycles?.count ?? 0)")
-                print("[PolarPlugin] snoozeTime count: \(sleepResult.snoozeTime?.count ?? 0)")
-                print("[PolarPlugin] alarmTime: \(sleepResult.alarmTime?.description ?? "nil")")
-                print("[PolarPlugin] originalSleepRange: \(sleepResult.originalSleepRange != nil ? "present" : "nil")")
-                print("[PolarPlugin] ================================")
-            }
-            
             // Convert to the structure Flutter expects: PolarSleepData with analysis wrapper
             do {
                 let encoder = JSONEncoder()
                 encoder.dateEncodingStrategy = .iso8601
                 
-                // Wrap each sleep analysis result in the expected PolarSleepData structure
+                // ✅ FIX: Ensure dates are always encoded as ISO8601 strings, not Maps
+                // This handles the iOS SDK update that changed how dates are serialized
+                encoder.outputFormatting = [.sortedKeys]
+                
+                // Wrap each sleep analysis result in the expected PolarSleepData structure  
+                // ✅ FIX: Use custom wrappers that convert all Date objects to ISO8601 strings
                 let wrappedSleepData = sleepAnalysisResults.map { analysisResult in
                     return PolarSleepDataWrapper(
                         date: dateComponentsToString(analysisResult.sleepResultDate),
@@ -1176,8 +1223,8 @@ public class SwiftPolarPlugin:
                 let jsonString = String(data: jsonData, encoding: .utf8)
                 
                 // Log the actual JSON being sent to Flutter
-                print("[PolarPlugin] JSON being sent to Flutter:")
-                print("[PolarPlugin] \(jsonString ?? "nil")")
+                // Log summary without verbose JSON (can be re-enabled for debugging if needed)
+                print("[PolarPlugin] Successfully serialized \(sleepAnalysisResults.count) sleep records to JSON")
                 
                 result(jsonString)
             } catch {
