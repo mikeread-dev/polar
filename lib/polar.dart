@@ -19,3 +19,6 @@ export 'src/model/polar_offline_recording_trigger_mode.dart';
 export 'src/model/polar_offline_recording_trigger.dart';
 export 'src/model/polar_firmware_update_status.dart';
 export 'src/polar_version_compatibility.dart';
+
+// Export logging utilities from shared models
+export 'package:wlab_shared_models/utils/sdk_logger.dart';

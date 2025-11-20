@@ -2,6 +2,7 @@ name: polar
 description: This is a Dart plugin wrapper for the Polar SDK on Android and iOS
 version: 7.5.1
 homepage: https://github.com/Rexios80/polar
+publish_to: none
 
 environment:
   sdk: ^3.0.0
@@ -16,6 +17,8 @@ dependencies:
   device_info_plus: ^10.0.1
   recase: ^4.0.0
   json_annotation: ^4.8.1
+  wlab_shared_models:
+    path: ../wlab_shared_models
 
 dev_dependencies:
   flutter_test:

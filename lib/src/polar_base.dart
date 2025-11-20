@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:polar/polar.dart';
@@ -1170,14 +1169,14 @@ class Polar {
         'error': 'Invalid response from platform'
       };
     } on PlatformException catch (e) {
-      debugPrint('[Polar] Error checking bonding state: ${e.message}');
+      SDKLogger.instance.error('Error checking bonding state: ${e.message}');
       return {
         'isBonded': false,
         'bondState': 'UNKNOWN',
         'error': e.message ?? 'Unknown error'
       };
     } catch (e) {
-      debugPrint('[Polar] Unexpected error checking bonding state: $e');
+      SDKLogger.instance.error('Unexpected error checking bonding state: $e');
       return {
         'isBonded': false,
         'bondState': 'UNKNOWN',
@@ -1193,13 +1192,13 @@ class Polar {
   Future<bool> openBluetoothSettings() async {
     try {
       final result = await _channel.invokeMethod('openBluetoothSettings');
-      debugPrint('[Polar] Bluetooth settings opened successfully');
+      SDKLogger.instance.info('Bluetooth settings opened successfully');
       return result == true;
     } on PlatformException catch (e) {
-      debugPrint('[Polar] Error opening Bluetooth settings: ${e.message}');
+      SDKLogger.instance.error('Error opening Bluetooth settings: ${e.message}');
       rethrow;
     } catch (e) {
-      debugPrint('[Polar] Unexpected error opening Bluetooth settings: $e');
+      SDKLogger.instance.error('Unexpected error opening Bluetooth settings: $e');
       rethrow;
     }
   }
@@ -1228,8 +1227,7 @@ class Polar {
       final toDateStr = '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}';
       
       // Log for debugging
-      debugPrint('Polar getSleep: local dates from=$fromDate, to=$toDate');
-      debugPrint('Polar getSleep: sending fromDateStr=$fromDateStr, toDateStr=$toDateStr');
+      SDKLogger.instance.debug('getSleep: local dates from=$fromDate, to=$toDate, sending fromDateStr=$fromDateStr, toDateStr=$toDateStr');
 
       final response = await _channel.invokeMethod(
         'getSleep',
@@ -1303,13 +1301,13 @@ class Polar {
   ///   - onError: Possible errors thrown as exceptions
   Future<bool> getSleepRecordingState(String identifier) async {
     try {
-      debugPrint('Polar getSleepRecordingState: checking state for $identifier');
+      SDKLogger.instance.debug('getSleepRecordingState: checking state for $identifier');
       final result = await _channel.invokeMethod<bool>('getSleepRecordingState', identifier);
-      debugPrint('Polar getSleepRecordingState: result is $result');
+      SDKLogger.instance.debug('getSleepRecordingState: result is $result');
       // If the result is null, default to false for safety
       return result ?? false;
     } on PlatformException catch (e) {
-      debugPrint('Polar getSleepRecordingState: error - ${e.code}: ${e.message}');
+      SDKLogger.instance.error('getSleepRecordingState error - ${e.code}: ${e.message}');
       switch (e.code) {
         case 'device_disconnected':
           throw PolarDeviceDisconnectedException('Device $identifier is not connected', e);
@@ -1319,7 +1317,7 @@ class Polar {
           throw PolarBluetoothOperationException('Failed to get sleep recording state: ${e.message}', e);
       }
     } catch (e) {
-      debugPrint('Polar getSleepRecordingState: unexpected error - $e');
+      SDKLogger.instance.error('getSleepRecordingState unexpected error - $e');
       throw PolarDataException('Error checking sleep recording state: $e');
     }
   }
@@ -1331,7 +1329,7 @@ class Polar {
   /// - Returns: Stream<bool> of values indicating if sleep recording is ongoing
   ///   - onError: Possible errors thrown as exceptions
   Stream<bool> observeSleepRecordingState(String identifier) {
-    debugPrint('Polar observeSleepRecordingState: starting observation for $identifier');
+    SDKLogger.instance.debug('observeSleepRecordingState: starting observation for $identifier');
     final channelName = 'polar/sleep_state/$identifier';
     
     // Create a method to setup the event channel
@@ -1372,8 +1370,7 @@ class Polar {
       final toDateStr = '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}';
       
       // Log for debugging
-      debugPrint('Polar deleteDeviceDateFolders: for device $identifier from=$fromDate, to=$toDate');
-      debugPrint('Polar deleteDeviceDateFolders: sending fromDateStr=$fromDateStr, toDateStr=$toDateStr');
+      SDKLogger.instance.debug('deleteDeviceDateFolders: device $identifier from=$fromDateStr, to=$toDateStr');
 
       await _channel.invokeMethod(
         'deleteDeviceDateFolders',
@@ -1393,7 +1390,7 @@ class Polar {
           throw PolarTimeoutException('Operation timed out: ${e.message}', e);
         case 'NO_SUCH_FILE_OR_DIRECTORY':
           // For cleanup operations, missing folders are not an error - the goal is achieved
-          debugPrint('Polar deleteDeviceDateFolders: some or all date folders were already missing, which is fine for cleanup');
+          SDKLogger.instance.debug('deleteDeviceDateFolders: folders already missing (cleanup successful)');
           return; // Treat as successful completion
         default:
           throw PolarBluetoothOperationException('Failed to delete device date folders: ${e.message}', e);
@@ -1426,8 +1423,7 @@ class Polar {
       final untilDateStr = '${until.year}-${until.month.toString().padLeft(2, '0')}-${until.day.toString().padLeft(2, '0')}';
       
       // Log for debugging
-      debugPrint('Polar deleteStoredDeviceData: for device $identifier type=$dataType until=$until');
-      debugPrint('Polar deleteStoredDeviceData: sending untilDateStr=$untilDateStr');
+      SDKLogger.instance.debug('deleteStoredDeviceData: device $identifier type=$dataType until=$untilDateStr');
 
       await _channel.invokeMethod(
         'deleteStoredDeviceData',
@@ -1447,7 +1443,7 @@ class Polar {
           throw PolarTimeoutException('Operation timed out: ${e.message}', e);
         case 'NO_SUCH_FILE_OR_DIRECTORY':
           // For cleanup operations, missing data is not an error - the goal is achieved
-          debugPrint('Polar deleteStoredDeviceData: data of type $dataType was already missing, which is fine for cleanup');
+          SDKLogger.instance.debug('deleteStoredDeviceData: data type $dataType already missing (cleanup successful)');
           return; // Treat as successful completion
         default:
           throw PolarBluetoothOperationException('Failed to delete stored device data: ${e.message}', e);
@@ -1467,7 +1463,7 @@ class Polar {
           .receiveBroadcastStream()
           .map((dynamic event) => event as bool)
           .handleError((error) {
-            debugPrint('Polar sleep state observation error: $error');
+            SDKLogger.instance.error('Sleep state observation error: $error');
             // Transform platform errors to our custom exceptions
             if (error is PlatformException) {
               switch (error.code) {
@@ -1482,7 +1478,7 @@ class Polar {
             throw PolarDataException('Sleep state observation error: $error');
           });
     } catch (e) {
-      debugPrint('Polar _setupObservationChannel error: $e');
+      SDKLogger.instance.error('_setupObservationChannel error: $e');
       throw PolarDataException('Failed to setup sleep state observation: $e');
     }
   }
