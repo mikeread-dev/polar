@@ -51,7 +51,7 @@ enum PolarSdkFeature {
     deviceTimeSetup: 'FEATURE_POLAR_DEVICE_TIME_SETUP',
     sdkMode: 'FEATURE_POLAR_SDK_MODE',
     ledAnimation: 'FEATURE_POLAR_LED_ANIMATION',
-    sleep: 'FEATURE_POLAR_SLEEP',
+    sleep: 'FEATURE_POLAR_SLEEP_DATA', // Fixed: Match Android SDK enum name
     feature: 'FEATURE_POLAR_ACTIVITY_DATA',
   };
 
