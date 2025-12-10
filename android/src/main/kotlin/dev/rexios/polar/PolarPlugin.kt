@@ -1162,11 +1162,6 @@ class PolarPlugin :
             .subscribe({ sleepDataList ->
                 println("[PolarPlugin] getSleep received ${sleepDataList.size} sleep records")
                 
-                // Debug the data we're getting back to help identify timezone issues
-                sleepDataList.forEach { sleepData ->
-                    println("[PolarPlugin] Sleep data date: ${sleepData.date}, result date: ${sleepData.result?.sleepResultDate}")
-                }
-                
                 runOnUiThread {
                     val jsonArray = sleepDataList.map { sleepData ->
                         mapOf(
