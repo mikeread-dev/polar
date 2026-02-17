@@ -337,6 +337,9 @@ class StreamingHandler extends MockStreamHandler {
             ),
           ],
         );
+      case PolarDataType.skinTemperature:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
 
     events.success(jsonEncode(data));
